@@ -109,7 +109,10 @@ cd godopty
 # Build everything
 cargo build
 
-# Run checks (no tests yet)
+# Run tests (23 unit tests)
+cargo test -p godopty-core
+
+# Run checks
 cargo check
 ```
 
@@ -221,6 +224,41 @@ Self-reaction loops are prevented: a terminal ignores events where `source_pane 
 - [ ] SQLite + FTS5 async logging backend
 - [ ] Session history persistence between restarts
 - [ ] `SIGWINCH` handling (Godot resize → PTY resize signal)
+
+---
+
+## Roadmap
+
+Features planned for future phases, roughly prioritized:
+
+### Layout & UX
+- [ ] **Drag-to-resize tile edges** — grab grid lines to resize panes (needs sub-grid positioning, deferred until pane type rewrite)
+- [ ] **Standalone mode** — test and fix canvas resizing outside the embedded editor
+- [ ] **Tab/workspace switching** — multiple named workspaces per session
+- [ ] **Title bar right-click menu** — split/close/move options
+
+### Pane Types
+- [ ] **File tree viewer** — Godot `Tree` node populated via `DirAccess` API
+- [ ] **Code viewer pane** — Godot `CodeEdit` node for read-only file display
+- [ ] **Task ledger** — persistent to-do list per workspace
+- [ ] **Pane type registry** — unified interface for adding custom pane types
+
+### Terminal Engine
+- [ ] **Search** — Ctrl+F regex search across scrollback using alacritty_terminal
+- [ ] **Damage tracking** — only redraw changed grid lines (optimization)
+- [ ] **PtyHandle.resize wired to SIGWINCH** — shell reflows on pane resize
+- [ ] **Configurable color palettes** — load xterm color schemes
+
+### Memory & Persistence
+- [ ] **SQLite + FTS5 history backend** — infinite scrollback with full-text search
+- [ ] **Session auto-save** — restore all PTY sessions on relaunch
+- [ ] **Concept persistence** — saved regex triggers survive restarts
+
+### Polish
+- [ ] **Configurable font selection** — user-provided .ttf path in settings
+- [ ] **Title bar vertical centering** — font baseline alignment fix
+- [ ] **Notification/warning system** — toast messages for errors and limits
+- [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
 
 ---
 
