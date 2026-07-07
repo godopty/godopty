@@ -1,23 +1,21 @@
 extends Control
 # godopty Terminal Pane — Control-based node for focus + rendering.
-# All @export variables appear in the Godot editor Inspector.
+
+signal title_changed(new_title: String)
 
 @export var shell_command: String = "/bin/bash"
 @export var rows: int = 24
 @export var cols: int = 80
 @export var font_size: int = 14
 
-# ── Font ────────────────────────────────────────────────────────────
 @export var font_path: String = "res://fonts/DejaVuSansMono.ttf"
 @export var font_bold_path: String = "res://fonts/DejaVuSansMono-Bold.ttf"
 @export var font_italic_path: String = "res://fonts/DejaVuSansMono-Oblique.ttf"
 
-# ── Cursor styling ──────────────────────────────────────────────────
-@export var cursor_shape: int = 0  # 0=Block, 1=Underline, 2=Beam
+@export var cursor_shape: int = 0
 @export var cursor_color: Color = Color(0.8, 0.8, 0.8, 0.7)
 @export var cursor_blink: bool = true
 
-# ── Terminal colors ─────────────────────────────────────────────────
 @export var default_fg: Color = Color(0.8, 0.8, 0.8)
 @export var default_bg: Color = Color(0.12, 0.12, 0.12)
 
@@ -30,7 +28,7 @@ var _cell_w: float = 0.0
 var _cell_h: float = 0.0
 var _cursor_blink_timer: float = 0.0
 var _cursor_visible: bool = true
-# ── Text selection ──────────────────────────────────────────────────
+var _last_title: String = ""
 var _selecting: bool = false
 var _sel_start: Vector2i = Vector2i(-1, -1)
 var _sel_end: Vector2i = Vector2i(-1, -1)
@@ -47,10 +45,7 @@ func _ready():
 	_cell_w = _font.get_char_size('W'.unicode_at(0), font_size).x
 	_cell_h = _font.get_height(font_size)
 
-	# Minimum size for grid layout
-	custom_minimum_size = Vector2(100, 50)  # allow grid to shrink panes
-
-	# Accept focus
+	custom_minimum_size = Vector2(4 * _cell_w + 4, _cell_h * 2 + 4)
 	focus_mode = Control.FOCUS_CLICK
 	clip_contents = true
 
@@ -63,22 +58,15 @@ func _on_resize():
 		_terminal.resize_grid(rows, cols)
 
 func _notification(what):
-	if what == NOTIFICATION_RESIZED:
-		_on_resize()
+	if what == NOTIFICATION_RESIZED: _on_resize()
 
 func _get_layout_state() -> Dictionary:
-	return {
-		"shell": shell_command,
-		"rows": rows,
-		"cols": cols,
-	}
+	return {"shell": shell_command, "rows": rows, "cols": cols}
 
 func _load_font(path: String, fallback: String) -> Font:
 	var f: Font
-	if path != "" and ResourceLoader.exists(path):
-		f = load(path)
-	else:
-		f = load(fallback)
+	if path != "" and ResourceLoader.exists(path): f = load(path)
+	else: f = load(fallback)
 	f.fixed_size = font_size
 	return f
 
@@ -100,220 +88,164 @@ func _process(delta):
 	else:
 		queue_redraw()
 
+	var t = _terminal.get_title()
+	if t != _last_title and t != "":
+		_last_title = t; title_changed.emit(t)
+
 func _cell_changed(new_grid: Array) -> bool:
-	if _cell_cache.size() != new_grid.size():
-		return true
+	if _cell_cache.size() != new_grid.size(): return true
 	for r in new_grid.size():
-		var new_row: Array = new_grid[r]
-		var old_row: Array = _cell_cache[r]
-		if new_row.size() != old_row.size():
-			return true
-		for c in new_row.size():
-			var nc: Dictionary = new_row[c]
-			var oc: Dictionary = old_row[c]
-			if nc["ch"] != oc["ch"] or nc["fg"] != oc["fg"] or nc["bg"] != oc["bg"]:
-				return true
-			if nc.get("bold", false) != oc.get("bold", false):
-				return true
-			if nc.get("inverse", false) != oc.get("inverse", false):
-				return true
+		var nr: Array = new_grid[r]; var or_: Array = _cell_cache[r]
+		if nr.size() != or_.size(): return true
+		for c in nr.size():
+			var nc: Dictionary = nr[c]; var oc: Dictionary = or_[c]
+			if nc["ch"] != oc["ch"] or nc["fg"] != oc["fg"] or nc["bg"] != oc["bg"]: return true
+			if nc.get("bold", false) != oc.get("bold", false): return true
+			if nc.get("inverse", false) != oc.get("inverse", false): return true
 	return false
 
+func _grid_offset() -> Vector2:
+	var gc = _cell_cache[0].size() if _cell_cache.size() > 0 else 1
+	var gr = _cell_cache.size()
+	var tw = gc * _cell_w; var th = gr * _cell_h
+	return Vector2(2 + maxf((size.x - 4 - tw) / 2.0, 0), 2 + maxf((size.y - 4 - th) / 2.0, 0))
+
 func _draw():
-	if _cell_cache.is_empty():
-		return
+	if _cell_cache.is_empty(): return
 
-	# Calculate cell size from container dimensions (fills available space)
-	var margin = 2
-	var avail_w = size.x - margin * 2
-	var avail_h = size.y - margin * 2
-	var grid_rows = _cell_cache.size()
-	var grid_cols = _cell_cache[0].size() if grid_rows > 0 else 1
-	var draw_cw = avail_w / maxi(grid_cols, 1)
-	var draw_ch = avail_h / maxi(grid_rows, 1)
+	var off = _grid_offset()
+	var baseline = _font.get_ascent(font_size)
 
-	# Fill entire background
 	draw_rect(Rect2(Vector2.ZERO, size), default_bg)
 
-	for r in grid_rows:
+	for r in _cell_cache.size():
 		var row: Array = _cell_cache[r]
 		for c in row.size():
 			var cell: Dictionary = row[c]
-			var x = margin + c * draw_cw
-			var y = margin + r * draw_ch
+			var x = off.x + c * _cell_w; var y = off.y + r * _cell_h
+			var fg = cell["fg"] as Color; var bg = cell["bg"] as Color
+			if cell.get("inverse", false): var tmp = fg; fg = bg; bg = tmp
 
-			var fg = cell["fg"] as Color
-			var bg = cell["bg"] as Color
-			if cell.get("inverse", false):
-				var tmp = fg; fg = bg; bg = tmp
-
-			draw_rect(Rect2(x, y, draw_cw, draw_ch), bg)
+			draw_rect(Rect2(x, y, _cell_w, _cell_h), bg)
 
 			var ch: String = cell["ch"]
 			if ch != " " and ch != "":
-				var use_font = _font
-				if cell.get("bold", false):
-					use_font = _font_bold
-				if cell.get("italic", false):
-					use_font = _font_italic
-				draw_string(use_font, Vector2(x, y + draw_ch - 2), ch,
-					HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, fg)
+				var uf = _font
+				if cell.get("bold", false): uf = _font_bold
+				if cell.get("italic", false): uf = _font_italic
+				draw_string(uf, Vector2(x, y + baseline), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, fg)
 
 			if cell.get("underline", false):
-				var ul_y = y + draw_ch - 2
-				draw_line(Vector2(x, ul_y), Vector2(x + draw_cw, ul_y), fg, 1.0)
+				draw_line(Vector2(x, y + baseline + 2), Vector2(x + _cell_w, y + baseline + 2), fg, 1.0)
 
-	# ── Focus border ─────────────────────────────────────────────────
+	# Focus border
 	if has_focus():
 		draw_rect(Rect2(0, 0, size.x, size.y), Color(0.4, 0.7, 1.0, 0.3), false, 2.0)
 
-	# ── Cursor ──────────────────────────────────────────────────────
+	# Cursor
 	if _cursor_visible:
-		var crow = _terminal.get_cursor_row()
-		var ccol = _terminal.get_cursor_col()
-		if crow >= 0 and ccol >= 0:
-			var cx = margin + ccol * draw_cw
-			var cy = margin + crow * draw_ch
-			var cshape = cursor_shape
-			var _cur_color = cursor_color
-
+		var cr = _terminal.get_cursor_row(); var cc = _terminal.get_cursor_col()
+		if cr >= 0 and cc >= 0:
+			var cx = off.x + cc * _cell_w; var cy = off.y + cr * _cell_h
 			var cursor_ch = ""
-			if crow < _cell_cache.size():
-				var row: Array = _cell_cache[crow]
-				if ccol < row.size():
-					cursor_ch = row[ccol]["ch"]
+			if cr < _cell_cache.size():
+				var rw: Array = _cell_cache[cr]
+				if cc < rw.size(): cursor_ch = rw[cc]["ch"]
 
-			match cshape:
+			match cursor_shape:
 				0:
-					draw_rect(Rect2(cx, cy, draw_cw, draw_ch), _cur_color)
+					draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
 					if cursor_ch != " " and cursor_ch != "":
-						draw_string(_font, Vector2(cx, cy + draw_ch - 2), cursor_ch,
-							HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
+						draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
 				1:
-					draw_rect(Rect2(cx, cy + draw_ch - 3, draw_cw, 3), _cur_color)
+					draw_rect(Rect2(cx, cy + _cell_h - 3, _cell_w, 3), cursor_color)
 				2:
-					draw_rect(Rect2(cx, cy, 2, draw_ch), _cur_color)
+					draw_rect(Rect2(cx, cy, 2, _cell_h), cursor_color)
 				_:
-					draw_rect(Rect2(cx, cy, draw_cw, draw_ch), _cur_color)
+					draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
 					if cursor_ch != " " and cursor_ch != "":
-						draw_string(_font, Vector2(cx, cy + draw_ch - 2), cursor_ch,
-							HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
+						draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
 
-	# ── Scrollback indicator ─────────────────────────────────────────
-	var offset = _terminal.get_scroll_offset()
-	if offset > 0:
-		draw_string(_font, Vector2((margin + draw_cw * 0.5), (margin + draw_ch * 0.5)),
-			"[Scroll: %d/%d lines]" % [offset, _terminal.get_history_size()],
+	# Scrollback
+	var so = _terminal.get_scroll_offset()
+	if so > 0:
+		draw_string(_font, Vector2(off.x + _cell_w * 0.5, off.y + _cell_h * 0.5),
+			"[Scroll: %d/%d lines]" % [so, _terminal.get_history_size()],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.YELLOW)
 
-	# ── Selection highlight ──────────────────────────────────────────
+	# Selection
 	if _sel_start.x >= 0 and _sel_end.x >= 0:
-		var sr0 = mini(_sel_start.y, _sel_end.y)
-		var sr1 = maxi(_sel_start.y, _sel_end.y)
-		var sc0 = mini(_sel_start.x, _sel_end.x)
-		var sc1 = maxi(_sel_start.x, _sel_end.x)
+		var sr0 = mini(_sel_start.y, _sel_end.y); var sr1 = maxi(_sel_start.y, _sel_end.y)
+		var sc0 = mini(_sel_start.x, _sel_end.x); var sc1 = maxi(_sel_start.x, _sel_end.x)
 		for r in range(sr0, sr1 + 1):
-			if r < 0 or r >= _cell_cache.size():
-				continue
-			var c_begin = sc0 if r == sr0 else 0
-			var c_end = (sc1 if r == sr1 else cols - 1) + 1
-			for c in range(c_begin, c_end):
+			if r < 0 or r >= _cell_cache.size(): continue
+			var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1) + 1
+			for c in range(cb, ce):
 				if c >= 0 and c < cols:
-					draw_rect(Rect2(margin + c * draw_cw, margin + r * draw_ch, draw_cw, draw_ch),
-						Color(0.3, 0.5, 1.0, 0.4))
+					draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), Color(0.3, 0.5, 1.0, 0.4))
 
 func _mouse_to_cell(pos: Vector2) -> Vector2i:
-	var margin = 2
-	return Vector2i(int((pos.x - margin) / _cell_w), int((pos.y - margin) / _cell_h))
+	var off = _grid_offset()
+	return Vector2i(int((pos.x - off.x) / _cell_w), int((pos.y - off.y) / _cell_h))
 
 func _get_selected_text() -> String:
-	if _sel_start.x < 0 or _sel_end.x < 0 or _cell_cache.is_empty():
-		return ""
-	var sr0 = mini(_sel_start.y, _sel_end.y)
-	var sr1 = maxi(_sel_start.y, _sel_end.y)
-	var sc0 = mini(_sel_start.x, _sel_end.x)
-	var sc1 = maxi(_sel_start.x, _sel_end.x)
+	if _sel_start.x < 0 or _sel_end.x < 0 or _cell_cache.is_empty(): return ""
+	var sr0 = mini(_sel_start.y, _sel_end.y); var sr1 = maxi(_sel_start.y, _sel_end.y)
+	var sc0 = mini(_sel_start.x, _sel_end.x); var sc1 = maxi(_sel_start.x, _sel_end.x)
 	var lines: Array[String] = []
 	for r in range(sr0, sr1 + 1):
-		if r < 0 or r >= _cell_cache.size():
-			continue
+		if r < 0 or r >= _cell_cache.size(): continue
 		var row: Array = _cell_cache[r]
-		var c_begin = sc0 if r == sr0 else 0
-		var c_end = (sc1 if r == sr1 else cols - 1)
+		var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1)
 		var line = ""
-		for c in range(c_begin, c_end + 1):
-			if c < row.size():
-				line += row[c]["ch"]
+		for c in range(cb, ce + 1):
+			if c < row.size(): line += row[c]["ch"]
 		lines.append(line.rstrip(" "))
 	return "\n".join(lines)
 
 func _gui_input(event):
-	# ── Mouse selection + scroll ────────────────────────────────────
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				grab_focus()
-				_selecting = true
-				_sel_start = _mouse_to_cell(event.position)
-				_sel_end = _sel_start
-				queue_redraw()
-			else:
-				_selecting = false
-				queue_redraw()
-
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			_terminal.scroll_up(3)
-		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-			_terminal.scroll_down(3)
-
+				grab_focus(); _selecting = true
+				_sel_start = _mouse_to_cell(event.position); _sel_end = _sel_start; queue_redraw()
+			else: _selecting = false; queue_redraw()
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed: _terminal.scroll_up(3)
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed: _terminal.scroll_down(3)
 	if event is InputEventMouseMotion and _selecting:
-		_sel_end = _mouse_to_cell(event.position)
-		queue_redraw()
+		_sel_end = _mouse_to_cell(event.position); queue_redraw()
 
-	# ── Keyboard ────────────────────────────────────────────────────
 	if event is InputEventKey and event.pressed:
-		# Ctrl+W = close this pane
 		if event.keycode == KEY_W and event.ctrl_pressed and not event.shift_pressed and not event.alt_pressed:
-			queue_free()
-			return
+			queue_free(); accept_event(); return
 		if event.keycode == KEY_C and event.ctrl_pressed and event.shift_pressed:
-			var sel_text = _get_selected_text()
-			if sel_text != "":
-				DisplayServer.clipboard_set(sel_text)
-			_sel_start = Vector2i(-1, -1)
-			_sel_end = Vector2i(-1, -1)
-			queue_redraw()
-			return
-
-		_sel_start = Vector2i(-1, -1)
-		_sel_end = Vector2i(-1, -1)
-
-		if event.keycode == KEY_PAGEUP:
-			_terminal.scroll_up(rows); return
-		if event.keycode == KEY_PAGEDOWN:
-			_terminal.scroll_down(rows); return
+			var st = _get_selected_text()
+			if st != "": DisplayServer.clipboard_set(st)
+			_sel_start = Vector2i(-1, -1); _sel_end = Vector2i(-1, -1); queue_redraw(); accept_event(); return
+		if event.keycode == KEY_V and event.ctrl_pressed and event.shift_pressed:
+			var cl = DisplayServer.clipboard_get()
+			if cl != "": _terminal.send_text(cl)
+			accept_event(); return
+		_sel_start = Vector2i(-1, -1); _sel_end = Vector2i(-1, -1)
+		if event.keycode == KEY_PAGEUP: _terminal.scroll_up(rows); accept_event(); return
+		if event.keycode == KEY_PAGEDOWN: _terminal.scroll_down(rows); accept_event(); return
 		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
-			_terminal.send_line("")
-			_terminal.scroll_reset()
-			return
-
+			_terminal.send_line(""); _terminal.scroll_reset(); accept_event(); return
 		_terminal.scroll_reset()
-		var text = _key_to_text(event)
-		if text != "":
-			_terminal.send_text(text)
+		var tx = _key_to_text(event)
+		if tx != "": _terminal.send_text(tx); accept_event()
 
 func _key_to_text(event: InputEventKey) -> String:
-	if event.unicode >= 32 and event.unicode <= 126:
-		return char(event.unicode)
+	if event.unicode >= 32 and event.unicode <= 126: return char(event.unicode)
 	match event.keycode:
 		KEY_BACKSPACE: return "\u007f"
-		KEY_TAB:        return "\t"
-		KEY_ESCAPE:     return "\u001b"
-		KEY_UP:         return "\u001b[A"
-		KEY_DOWN:       return "\u001b[B"
-		KEY_RIGHT:      return "\u001b[C"
-		KEY_LEFT:       return "\u001b[D"
-		KEY_HOME:       return "\u001b[H"
-		KEY_END:        return "\u001b[F"
-		KEY_DELETE:     return "\u001b[3~"
+		KEY_TAB: return "\t"
+		KEY_ESCAPE: return "\u001b"
+		KEY_UP: return "\u001b[A"
+		KEY_DOWN: return "\u001b[B"
+		KEY_RIGHT: return "\u001b[C"
+		KEY_LEFT: return "\u001b[D"
+		KEY_HOME: return "\u001b[H"
+		KEY_END: return "\u001b[F"
+		KEY_DELETE: return "\u001b[3~"
 	return ""
