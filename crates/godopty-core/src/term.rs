@@ -59,10 +59,10 @@ impl Dimensions for GridSize {
 ///
 /// ```ignore
 /// let mut grid = TermGrid::new(24, 80);
-/// grid.feed(b"Hello, \x1b[31mworld\x1b[0m!\r\n");
+/// grid.feed(b"Hello, \x1b[91mworld\x1b[0m!\r\n");
 /// let rows = grid.renderable_rows();
 /// assert_eq!(rows[0][7].ch, 'w');
-/// assert_eq!(rows[0][7].fg, [255, 0, 0]); // red
+/// assert_eq!(rows[0][7].fg, [255, 0, 0]); // bright red via \\x1b[91m
 /// ```
 /// A custom event listener that captures OSC window title sequences.
 struct TitleListener {
