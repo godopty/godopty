@@ -1,0 +1,14 @@
+[package]
+name = "godopty-core"
+version = "0.1.0"
+edition = "2024"
+description = "Core library for godopty: PTY management, terminal parsing, and concept-based orchestration"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+regex = "1"
+portable-pty = "0.9"
+vte = "0.15"
+log = "0.4"
+thiserror = "2"
+alacritty_terminal = "0.26.0"

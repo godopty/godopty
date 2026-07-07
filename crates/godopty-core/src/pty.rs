@@ -1,0 +1,64 @@
+use std::io::{Read, Write};
+use std::thread;
+
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use tokio::sync::mpsc::UnboundedSender;
+
+pub struct PtyHandle {
+    pub id: u32,
+    writer: Box<dyn Write + Send>,
+    master: Box<dyn MasterPty + Send>,
+    _child: Box<dyn portable_pty::Child + Send + Sync>,
+    _read_thread: thread::JoinHandle<()>,
+}
+
+impl PtyHandle {
+    pub fn spawn(
+        id: u32, command: &str, args: &[&str], tx: UnboundedSender<Vec<u8>>,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let pty_system = native_pty_system();
+        let mut cmd = CommandBuilder::new(command);
+        cmd.args(args);
+        cmd.env("TERM", "xterm-256color");
+
+        let pty_pair = pty_system.openpty(PtySize {
+            rows: 24, cols: 80, pixel_width: 0, pixel_height: 0,
+        })?;
+        let child = pty_pair.slave.spawn_command(cmd)?;
+        let mut reader = pty_pair.master.try_clone_reader()?;
+        let writer = pty_pair.master.take_writer()?;
+        let master = pty_pair.master;
+
+        let read_thread = thread::Builder::new()
+            .name(format!("pty-reader-{id}"))
+            .spawn(move || {
+                let mut buf = [0u8; 4096];
+                loop {
+                    match reader.read(&mut buf) {
+                        Ok(0) => break,
+                        Ok(n) => { if tx.send(buf[..n].to_vec()).is_err() { break; } }
+                        Err(e) => { log::error!("[PTY {id}] Read error: {e}"); break; }
+                    }
+                }
+            })?;
+
+        Ok(Self { id, writer, master, _child: child, _read_thread: read_thread })
+    }
+
+    pub fn write_line(&mut self, line: &str) -> Result<(), std::io::Error> {
+        self.writer.write_all(line.as_bytes())?;
+        self.writer.write_all(b"\n")?;
+        self.writer.flush()
+    }
+
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), std::io::Error> {
+        self.writer.write_all(data)?;
+        self.writer.flush()
+    }
+
+    /// Resize the PTY — sends SIGWINCH to the child process.
+    pub fn resize(&self, rows: u16, cols: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.master.resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })?;
+        Ok(())
+    }
+}

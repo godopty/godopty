@@ -1,0 +1,39 @@
+# ── Rust ──────────────────────────────────────────────────────────────────
+/target/
+**/*.rs.bk
+
+# Compiled GDExtension libraries
+*.so
+*.dylib
+*.dll
+
+# ── Godot ─────────────────────────────────────────────────────────────────
+# Godot 4+ project files (keep project.godot, but ignore imports)
+godot/.import/
+godot/.godot/
+godot/*.import
+godot/.godot/imported/
+godot/export/
+godot/export_presets.cfg
+
+# Godot-specific transient files
+*.translation
+godot/.mono/
+godot/mono_crash.*.json
+
+# ── IDE / Editor ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ── Misc ──────────────────────────────────────────────────────────────────
+*.log
+.env
+.env.local
+
+# AI
+reasonix.toml
+.reasonix/

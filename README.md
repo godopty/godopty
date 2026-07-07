@@ -1,0 +1,259 @@
+# godopty
+
+**A Godot-based Rust multi-PTY emulator** — a desktop application for creating, expanding, and orchestrating terminal sessions in a fluid, grid-based GUI.
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Godot 4.3+ Frontend (Phase 2–3)                            │
+│  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌───────────────┐    │
+│  │ Terminal │ │ Terminal │ │ File-Tree │ │ Task Ledger   │    │
+│  │  Pane   │ │  Pane   │ │  Viewer   │ │               │    │
+│  └────┬────┘ └────┬────┘ └──────────┘ └───────────────┘    │
+│       │           │                                         │
+│  ┌────┴───────────┴────────────────────────────────────┐    │
+│  │  Nested SplitContainer + Drag-and-Drop              │    │
+│  └─────────────────────────┬───────────────────────────┘    │
+│                            │                                │
+│  ┌─────────────────────────┴───────────────────────────┐    │
+│  │  gdext Bridge (rust → Godot character grid arrays)   │    │
+│  └─────────────────────────┬───────────────────────────┘    │
+└────────────────────────────┼────────────────────────────────┘
+                             │
+┌────────────────────────────┼────────────────────────────────┐
+│  Rust Backend (godopty-core)                                 │
+│  ┌─────────────────────────┴───────────────────────────┐    │
+│  │  WorkspaceEngine — tokio::sync::broadcast pub-sub    │    │
+│  │  Concept registry (regex triggers → labelled actions) │    │
+│  └──────────┬──────────────────────┬───────────────────┘    │
+│             │                      │                        │
+│  ┌──────────┴──────────┐  ┌───────┴───────────────────┐    │
+│  │  pty.rs              │  │  parser.rs                │    │
+│  │  portable-pty spawn  │  │  vte ANSI state machine   │    │
+│  │  dedicated I/O thread│  │  extracts visible lines   │    │
+│  │  cross-platform      │  │                            │    │
+│  └──────────────────────┘  └────────────────────────────┘    │
+│                                                              │
+│  Future: SQLite + FTS5 memory backend                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| PTY library | `portable-pty` | Cross-platform (Linux `/dev/ptmx` + Windows ConPTY) with a single API |
+| ANSI parsing | `vte` crate | Fastest Rust ANSI state machine; used by Alacritty |
+| Async runtime | `tokio` | Mature, full-featured; native `broadcast` channel for 1:N pub-sub |
+| I/O threading | Dedicated `std::thread` per PTY | Predictable blocking reads; bridges to tokio via `mpsc` |
+| Pub-sub | `tokio::sync::broadcast(1024)` | 1:N fan-out, lagged-receiver protection, self-reaction prevention |
+| Grid rendering | `alacritty_terminal` | Full DEC STD 070 grid state machine; pass arrays to Godot `_draw()` |
+| Godot bridge | `gdext 0.5` | Native GDExtension for Godot 4.7 |
+| Rust edition | 2024 | Requires Rust ≥ 1.85 |
+
+---
+
+## Project Structure
+
+```
+godopty/
+├── Cargo.toml                  # Workspace root
+├── README.md
+├── .gitignore
+├── crates/
+│   ├── godopty-core/           # Library crate
+│   │   ├── README.md
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs          # Module map + data-flow diagram
+│   │       ├── types.rs        # Concept, Event, Action, TerminalConfig
+│   │       ├── concept.rs      # Regex matching + label routing (pure fns)
+│   │       ├── engine.rs       # WorkspaceEngine + SpawnedTerminal
+│   │       ├── pty.rs          # portable-pty spawn + dedicated I/O thread
+│   │       ├── parser.rs       # vte Perform → plain-text lines
+│   │       └── term.rs         # alacritty_terminal grid + CellInfo
+│   ├── godopty-cli/            # CLI demos
+│   │   ├── README.md
+│   │   ├── Cargo.toml
+│   │   └── src/main.rs         # 3 demo modes (mock, --pty, --term)
+│   └── godopty-gdext/          # Godot 4 GDExtension
+│       ├── README.md
+│       ├── Cargo.toml
+│       └── src/lib.rs          # GodoptyTerminal GodotClass
+└── godot/                      # Godot 4.7 project
+    ├── project.godot
+    ├── godopty.gdextension
+    └── scenes/
+        ├── main.tscn
+        └── terminal.gd
+```
+
+---
+
+## Development Setup
+
+### Prerequisites
+
+- **Rust** ≥ 1.85 (tested on 1.96.0)
+- **Linux** (primary target) or **Windows 11** (ConPTY supported via `portable-pty`)
+- **Godot 4.4+** (tested on 4.7) with GDExtension support
+
+### Quick Start
+
+```bash
+# Clone and build
+git clone <repo-url> godopty
+cd godopty
+
+# Build everything
+cargo build
+
+# Run checks (no tests yet)
+cargo check
+```
+
+### Run the Demos
+
+```bash
+# Mock terminal demo (validates pub-sub engine)
+cargo run --bin godopty-cli
+
+# Real-PTY demo (requires Linux or Windows 11)
+cargo run --bin godopty-cli -- --pty
+
+# Terminal grid demo (validates alacritty_terminal ANSI + color processing)
+cargo run --bin godopty-cli -- --term
+
+# Build the GDExtension
+cargo build -p godopty-gdext
+
+# Open in Godot editor
+cd godot && godot -e
+
+# Verbose logging
+RUST_LOG=debug cargo run --bin godopty-cli
+```
+
+**Mock demo output:**
+```
+[Pane 1] Broadcasting event: "port_conflict"
+[Pane 2] Received topic 'port_conflict'. Would execute: echo '[Auto] Port conflict...'
+[Pane 1] Broadcasting event: "crash_detected"
+[Pane 3] Received topic 'crash_detected'. Would execute: echo '[Auto] Restart attempt...'
+```
+
+**Real-PTY demo output:**
+```
+>>> Injecting: echo 'ERROR: Address 8080 already in use'
+[Pane 1] PTY: ERROR: Address 8080 already in use
+[Pane 1] Broadcasting event: "port_conflict"
+[Pane 2] Received topic 'port_conflict'. Injecting: echo '[Auto] Port conflict...'
+[Pane 2] PTY: [Auto] Port conflict detected — consider lsof -i
+```
+
+---
+
+## Concept System
+
+Concepts are the core orchestration primitive — a regex trigger paired with labelled actions:
+
+```rust
+Concept {
+    name: "port_conflict",
+    trigger_regex: Regex::new(r"(?i)address.*already.*in\s*use").unwrap(),
+    destinations: vec![Action {
+        command_template: "echo '[Auto] Port conflict detected — consider lsof -i'",
+        target_label: "observer",   // only delivered to terminals with this label
+    }],
+}
+```
+
+**How it works:**
+1. PTY output bytes stream through the `vte` parser
+2. The parser strips ANSI escape sequences and extracts visible text lines
+3. Each line is tested against every registered concept's `trigger_regex`
+4. On match, an `Event` is broadcast on the `tokio::sync::broadcast` channel
+5. Every terminal task receives the event, checks its labels against each action's `target_label`
+6. Matching terminals inject the `command_template` into their PTY's stdin
+
+Self-reaction loops are prevented: a terminal ignores events where `source_pane == my_id`.
+
+---
+
+## Implementation Phases
+
+### ✅ Phase 1 — Headless Rust Prototype (COMPLETE)
+
+- [x] Rust workspace with `godopty-core` lib + `godopty-cli` binary
+- [x] Cross-platform PTY spawning via `portable-pty` with dedicated I/O threads
+- [x] ANSI escape sequence stripping via `vte` state machine
+- [x] `WorkspaceEngine` with `tokio::sync::broadcast` pub-sub
+- [x] Concept registry: regex triggers → label-gated action routing
+- [x] Mock terminal demo validating 3-terminal fan-out routing
+- [x] Real-PTY demo validating end-to-end pipeline (bash → vte → regex → broadcast → cross-PTY injection)
+
+### ✅ Phase 2a — Headless Terminal Grid (COMPLETE)
+
+- [x] `alacritty_terminal` integration for full DEC STD 070 grid emulation
+- [x] `TermGrid` wrapper with grid export as `Vec<Vec<CellInfo>>`
+- [x] Color conversion: Named, Indexed (256-color), and True Color → RGB
+- [x] `SpawnedTerminal` with `Arc<Mutex<TermGrid>>` for Godot polling
+- [x] `--term` CLI demo validating ANSI color processing
+- [x] Full inline documentation on all source files
+
+### ✅ Phase 2b — Godot + gdext Bridge (COMPLETE)
+
+- [x] `godopty-gdext` crate (cdylib, gdext 0.5, Godot 4.7)
+- [x] `GodoptyTerminal` GodotClass: `start_shell()`, `send_input()`, `get_grid_rows()`
+- [x] Global tokio runtime (`LazyLock`) shared across all terminal nodes
+- [x] GDScript `terminal.gd`: `_draw()` renderer + `_input()` keyboard forwarding
+- [x] Cell cache with dirty-check for efficient redraws
+- [x] Edge cases documented: double start, spawn failure, empty grid, lock contention
+
+### 🔜 Phase 3 — Spatial Layout & SQLite
+
+- [ ] Nested `SplitContainer` logic
+- [ ] Drag-and-drop pane swapping
+- [ ] Label/Tag UI for terminals
+- [ ] Code Viewer panes (`CodeEdit` node)
+- [ ] Task Ledger pane
+- [ ] SQLite + FTS5 async logging backend
+- [ ] Session history persistence between restarts
+- [ ] `SIGWINCH` handling (Godot resize → PTY resize signal)
+
+---
+
+## Technical Hurdles & Mitigations
+
+### Cross-Platform PTY
+- `portable-pty` provides a uniform API over POSIX `/dev/ptmx` and Windows ConPTY
+- Process-killing must be abstracted: Unix uses POSIX signals, Windows uses `TerminateProcess`
+- Environment variable setup differs per platform
+
+### SIGWINCH (Window Resize)
+- Godot `SplitContainer` resize → GDScript signal
+- Pass new `(rows, cols)` through `gdext` to Rust
+- Forward `PtySize` to `portable-pty` master → OS sends `SIGWINCH` to child process
+- `alacritty_terminal` reflows the grid
+
+### gdext + tokio Bridge
+- Godot runs its own main loop on the main thread
+- A global tokio runtime is started at extension init
+- PTY threads push grid snapshots into a `Mutex<Vec<(TerminalId, GridData)>>`
+- Godot's `_process()` drains the queue and updates `_draw()`
+- This avoids blocking the Godot render thread
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Ensure `cargo check` passes
+4. Run both demos to verify no regressions
+5. Submit a pull request
+
+## License
+
+TBD

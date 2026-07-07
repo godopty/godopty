@@ -1,0 +1,312 @@
+//! Godot 4 GDExtension for godopty — bridges the Rust terminal engine
+//! to Godot's rendering pipeline.
+//!
+//! ## Architecture
+//!
+//! - A **global tokio runtime** is started at extension init and shared
+//!   across all terminal nodes.
+//! - Each [`GodoptyTerminal`] node wraps a [`SpawnedTerminal`], which runs
+//!   a background task feeding PTY output into a renderable grid.
+//! - GDScript polls the grid in `_process()` and renders it in `_draw()`.
+//! - Keyboard input flows GDScript → Rust → PTY stdin.
+
+use std::sync::LazyLock;
+
+use godot::prelude::*;
+
+use godopty_core::engine::{SpawnedTerminal, WorkspaceEngine};
+use godopty_core::types::TerminalConfig;
+
+// ═══════════════════════════════════════════════════════════════════════
+// Global tokio runtime + engine
+// ═══════════════════════════════════════════════════════════════════════
+
+static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("failed to start tokio runtime")
+});
+
+static ENGINE: LazyLock<WorkspaceEngine> =
+    LazyLock::new(|| WorkspaceEngine::new(Vec::new()));
+
+// ═══════════════════════════════════════════════════════════════════════
+// GodoptyTerminal — a Godot node backed by a Rust PTY session
+// ═══════════════════════════════════════════════════════════════════════
+
+#[derive(GodotClass)]
+#[class(base = Node2D)]
+struct GodoptyTerminal {
+    spawned: Option<SpawnedTerminal>,
+    next_id: u32,
+}
+
+#[godot_api]
+impl INode2D for GodoptyTerminal {
+    fn init(_base: Base<Node2D>) -> Self {
+        Self {
+            spawned: None,
+            next_id: 1,
+        }
+    }
+}
+
+#[godot_api]
+impl GodoptyTerminal {
+    /// Start a shell in this terminal pane.
+    ///
+    /// Spawns a PTY at `rows × cols`. Call once during `_ready()`.
+    ///
+    /// # Edge cases
+    /// - Calling twice replaces the previous session.
+    /// - If spawning fails, the grid stays empty and `get_grid_rows()` returns `[]`.
+    /// - `rows` and `cols` are clamped to ≥1.
+    #[func]
+    fn start_shell(&mut self, command: GString, rows: i64, cols: i64) {
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let config = TerminalConfig {
+            id,
+            labels: Vec::new(),
+        };
+
+        let rows = rows.max(1) as usize;
+        let cols = cols.max(1) as usize;
+
+        log::info!("[GDExt] Starting PTY {id}: {command} ({rows}×{cols})");
+
+        match RUNTIME.block_on(ENGINE.spawn_terminal_with_grid(
+            config,
+            &command.to_string(),
+            &[],
+            rows,
+            cols,
+        )) {
+            Ok(spawned) => {
+                self.spawned = Some(spawned);
+            }
+            Err(e) => {
+                godot_error!("Failed to spawn PTY for '{command}': {e}");
+            }
+        }
+    }
+
+    /// Send raw text to the PTY — NO newline appended.
+    ///
+    /// Use this for interactive keyboard input. The shell's line discipline
+    /// handles echo, backspace, and line buffering. For submitting a command
+    /// (Enter key), use `send_line()`.
+    #[func]
+    fn send_text(&mut self, text: GString) {
+        if let Some(ref spawned) = self.spawned {
+            spawned.handle.send_text(&text.to_string());
+        }
+    }
+
+    /// Send a complete line to the PTY (appends `\n`).
+    ///
+    /// Use this for the Enter key to submit a command, or for concept-triggered
+    /// action commands.
+    #[func]
+    fn send_line(&mut self, text: GString) {
+        if let Some(ref spawned) = self.spawned {
+            spawned.handle.send_line(&text.to_string());
+        }
+    }
+
+    /// Cursor row position (0-based). Returns -1 if no shell or cursor hidden.
+    #[func]
+    fn get_cursor_row(&self) -> i64 {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                if let Some((row, _col)) = g.cursor_position() {
+                    return row as i64;
+                }
+            }
+        }
+        -1
+    }
+
+    /// Cursor column position (0-based). Returns -1 if no shell or cursor hidden.
+    #[func]
+    fn get_cursor_col(&self) -> i64 {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                if let Some((_row, col)) = g.cursor_position() {
+                    return col as i64;
+                }
+            }
+        }
+        -1
+    }
+
+    /// Cursor shape: 0 = Block, 1 = Underline, 2 = Beam.
+    #[func]
+    fn get_cursor_shape(&self) -> i64 {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                return g.cursor_shape() as i64;
+            }
+        }
+        -1
+    }
+
+    /// Resize the terminal grid and PTY to `rows × cols`.
+    /// Sends SIGWINCH to the child process so bash/zsh reflows.
+    #[func]
+    fn resize_grid(&mut self, rows: i64, cols: i64) {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(mut g) = spawned.grid.lock() {
+                g.resize(rows.max(1) as usize, cols.max(1) as usize);
+            }
+            spawned.handle.resize_pty(rows.max(1) as u16, cols.max(1) as u16);
+        }
+    }
+
+    /// Terminal window title (from OSC escape sequences). Empty string if none set.
+    #[func]
+    fn get_title(&self) -> GString {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                return GString::from(&g.title());
+            }
+        }
+        GString::new()
+    }
+
+    // ── Scrollback ──────────────────────────────────────────────────
+
+    /// Scroll up by `lines` (back in terminal history).
+    #[func]
+    fn scroll_up(&mut self, lines: i64) {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(mut g) = spawned.grid.lock() {
+                g.scroll_up(lines.max(0) as usize);
+            }
+        }
+    }
+
+    /// Scroll down by `lines` (forward in terminal history).
+    #[func]
+    fn scroll_down(&mut self, lines: i64) {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(mut g) = spawned.grid.lock() {
+                g.scroll_down(lines.max(0) as usize);
+            }
+        }
+    }
+
+    /// Reset scroll position to follow live output.
+    #[func]
+    fn scroll_reset(&mut self) {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(mut g) = spawned.grid.lock() {
+                g.scroll_reset();
+            }
+        }
+    }
+
+    /// Current scrollback offset (lines above visible viewport).
+    #[func]
+    fn get_scroll_offset(&self) -> i64 {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                return g.display_offset() as i64;
+            }
+        }
+        0
+    }
+
+    /// Total lines of scrollback history available.
+    #[func]
+    fn get_history_size(&self) -> i64 {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                return g.history_size() as i64;
+            }
+        }
+        0
+    }
+
+    /// Number of rows in the terminal grid (0 if no shell started).
+    #[func]
+    fn get_rows(&self) -> i64 {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                return g.num_rows() as i64;
+            }
+        }
+        0
+    }
+
+    /// Number of columns in the terminal grid.
+    #[func]
+    fn get_cols(&self) -> i64 {
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                return g.num_cols() as i64;
+            }
+        }
+        0
+    }
+
+    /// Return all rows as `Array[Array[Dictionary]]`.
+    ///
+    /// Each dictionary has keys: `"ch"` (String), `"fg"` (Color), `"bg"` (Color).
+    /// Empty cells are `"ch": " "` with default terminal colors.
+    ///
+    /// # Edge cases
+    /// - Returns `[]` if no shell started or grid lock is momentarily held.
+    #[func]
+    fn get_grid_rows(&self) -> Array<Variant> {
+        let mut result = Array::<Variant>::new();
+
+        if let Some(ref spawned) = self.spawned {
+            if let Ok(g) = spawned.grid.lock() {
+                for row in g.renderable_rows() {
+                    let mut row_arr = Array::<Variant>::new();
+                    for cell in row {
+                        let mut dict = Dictionary::<Variant, Variant>::new();
+                        dict.set("ch", &Variant::from(cell.ch.to_string()));
+                        dict.set(
+                            "fg",
+                            &Variant::from(Color::from_rgb(
+                                cell.fg[0] as f32 / 255.0,
+                                cell.fg[1] as f32 / 255.0,
+                                cell.fg[2] as f32 / 255.0,
+                            )),
+                        );
+                        dict.set(
+                            "bg",
+                            &Variant::from(Color::from_rgb(
+                                cell.bg[0] as f32 / 255.0,
+                                cell.bg[1] as f32 / 255.0,
+                                cell.bg[2] as f32 / 255.0,
+                            )),
+                        );
+                        dict.set("bold", &Variant::from(cell.bold));
+                        dict.set("italic", &Variant::from(cell.italic));
+                        dict.set("underline", &Variant::from(cell.underline));
+                        dict.set("inverse", &Variant::from(cell.inverse));
+                        row_arr.push(&dict);
+                    }
+                    result.push(&row_arr);
+                }
+            }
+        }
+
+        result
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Extension entry point
+// ═══════════════════════════════════════════════════════════════════════
+
+struct GodoptyExtension;
+
+#[gdextension]
+unsafe impl ExtensionLibrary for GodoptyExtension {}
