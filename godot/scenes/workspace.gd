@@ -3,10 +3,11 @@ extends Control
 
 const LAYOUT_FILE = "user://layout.json"
 const DEFAULT_SHELL = "/bin/bash"
-const GRID = 12  # virtual grid size
-const MIN_TILE = 2  # minimum tile size in grid cells (each dimension)
+const GRID = 12
+const MIN_TILE = 2
 
 var _sidebar: Control
+var _sidebar_bg: ColorRect
 var _sidebar_on := true
 var _palette: Control
 var _grid: Control
@@ -14,54 +15,35 @@ var _last_body: Control
 var _tiles: Array = []  # [{wrapper, col, row, cspan, rspan}]
 
 func _ready():
-	show()  # safety: always visible regardless of scene file state
-	print("[Workspace] _ready() starting")
+	show()
 	DisplayServer.window_set_min_size(Vector2i(500, 300))
 
 	_grid = Control.new()
-	_grid.add_theme_color_override("panel", Color(0.05, 0.05, 0.05))
 	add_child(_grid)
-	print("[Workspace] grid added")
-
 	_build_sidebar()
-	print("[Workspace] sidebar built, visible=", _sidebar.visible, " on=", _sidebar_on)
 	_sidebar.show()
 	_apply_layout()
-	print("[Workspace] layout applied, grid size=", _grid.size)
 
-	if FileAccess.file_exists(LAYOUT_FILE):
-		print("[Workspace] layout file exists, restoring...")
-		_restore()
-	else:
-		print("[Workspace] no layout file, blank canvas")
-
-	print("[Workspace] _ready() done, tiles=", _tiles.size(), " sidebar_visible=", _sidebar.visible)
-
-# ═══════════════════════════════════════════════════════════════════════
-# Layout engine
-# ═══════════════════════════════════════════════════════════════════════
+	if FileAccess.file_exists(LAYOUT_FILE): _restore()
 
 func _notification(what):
 	if what == NOTIFICATION_RESIZED: _apply_layout()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST: _save()
 
+# ═══════════════════════════════════════════════════════════════════════
+# Layout
+# ═══════════════════════════════════════════════════════════════════════
+
 func _apply_layout():
 	if _grid == null: return
-	# Grid fills space right of sidebar
-	var m = 180 if _sidebar_on else 0
-	_grid.offset_left = m
-	_grid.offset_right = 0
-	_grid.offset_top = 0
-	_grid.offset_bottom = 0
-	_grid.anchor_left = 0.0
-	_grid.anchor_right = 1.0
-	_grid.anchor_top = 0.0
-	_grid.anchor_bottom = 1.0
+	var m = 180 if _sidebar_on else 20
+	_grid.offset_left = m; _grid.offset_right = 0
+	_grid.offset_top = 0; _grid.offset_bottom = 0
+	_grid.anchor_left = 0.0; _grid.anchor_right = 1.0
+	_grid.anchor_top = 0.0; _grid.anchor_bottom = 1.0
 
-	# Position every tile
 	var cw = maxf(_grid.size.x, 1.0) / GRID
 	var ch = maxf(_grid.size.y, 1.0) / GRID
-	print("[layout] grid=", _grid.size, " cell=", cw, "x", ch, " tiles=", _tiles.size())
 	for t in _tiles:
 		var x = t.col * cw; var y = t.row * ch
 		var w = t.cspan * cw; var h = t.rspan * ch
@@ -69,11 +51,9 @@ func _apply_layout():
 		t.wrapper.offset_right = x + w; t.wrapper.offset_bottom = y + h
 		t.wrapper.anchor_left = 0.0; t.wrapper.anchor_right = 0.0
 		t.wrapper.anchor_top = 0.0; t.wrapper.anchor_bottom = 0.0
-		print("  tile cspan=", t.cspan, " rspan=", t.rspan, " calc=", w, "x", h, " actual=", t.wrapper.size)
-
 
 # ═══════════════════════════════════════════════════════════════════════
-# Tile operations
+# Spawn / Kill
 # ═══════════════════════════════════════════════════════════════════════
 
 func _spawn(shell := DEFAULT_SHELL, rows := 24, cols := 80) -> Control:
@@ -90,7 +70,7 @@ func _spawn(shell := DEFAULT_SHELL, rows := 24, cols := 80) -> Control:
 	_list()
 	var body = _find_body(w)
 	body.focus_entered.connect(func(): _last_body = body)
-	return body  # caller calls grab_focus()
+	return body
 
 func _split_for(w: Control) -> bool:
 	var bi = 0; var ba = 0
@@ -121,18 +101,46 @@ func _kill(body: Control):
 	var rm = _tiles[wi]
 	_tiles.remove_at(wi)
 
-	# Expand first adjacent tile into the gap
-	for t in _tiles:
-		if t.row == rm.row and t.rspan == rm.rspan:
-			if t.col + t.cspan == rm.col: t.cspan += rm.cspan; break
-			if rm.col + rm.cspan == t.col: t.col = rm.col; t.cspan += rm.cspan; break
-		if t.col == rm.col and t.cspan == rm.cspan:
-			if t.row + t.rspan == rm.row: t.rspan += rm.rspan; break
-			if rm.row + rm.rspan == t.row: t.row = rm.row; t.rspan += rm.rspan; break
+	# Expand tiles to fill the gap. Try exact-match first, then partial.
+	if not _expand_exact(rm):
+		_expand_partial(rm)
 
 	rm.wrapper.queue_free()
 	_apply_layout()
 	_list()
+
+func _expand_exact(rm: Dictionary) -> bool:
+	for t in _tiles:
+		if t.row == rm.row and t.rspan == rm.rspan:
+			if t.col + t.cspan == rm.col: t.cspan += rm.cspan; return true
+			if rm.col + rm.cspan == t.col: t.col = rm.col; t.cspan += rm.cspan; return true
+		if t.col == rm.col and t.cspan == rm.cspan:
+			if t.row + t.rspan == rm.row: t.rspan += rm.rspan; return true
+			if rm.row + rm.rspan == t.row: t.row = rm.row; t.rspan += rm.rspan; return true
+	return false
+
+func _expand_partial(rm: Dictionary):
+	# Expand ALL tiles that share an edge with rm
+	var left = []; var right = []; var up = []; var down = []
+	for t in _tiles:
+		if t.col + t.cspan == rm.col: left.append(t)
+		if rm.col + rm.cspan == t.col: right.append(t)
+		if t.row + t.rspan == rm.row: up.append(t)
+		if rm.row + rm.rspan == t.row: down.append(t)
+
+	if left.size() > 0 or right.size() > 0:
+		var new_right = rm.col + rm.cspan
+		for t in left: t.cspan = new_right - t.col
+		for t in right: t.col = rm.col; t.cspan = (t.col + t.cspan) - rm.col
+		return
+	if up.size() > 0 or down.size() > 0:
+		var new_bottom = rm.row + rm.rspan
+		for t in up: t.rspan = new_bottom - t.row
+		for t in down: t.row = rm.row; t.rspan = (t.row + t.rspan) - rm.row
+		return
+	if _tiles.size() > 0:
+		_tiles[0].col = 0; _tiles[0].row = 0
+		_tiles[0].cspan = GRID; _tiles[0].rspan = GRID
 
 func _kill_last():
 	if _last_body: _kill(_last_body)
@@ -149,7 +157,6 @@ func _reset():
 # ═══════════════════════════════════════════════════════════════════════
 
 func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
-	# PanelContainer draws the border; VBoxContainer stacks children
 	var root = PanelContainer.new()
 	var sb = StyleBoxFlat.new()
 	sb.bg_color = Color(0.1, 0.1, 0.1, 1.0)
@@ -164,13 +171,19 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(vbox)
 
-	# Title bar — simple HBox with background
-	var bar = Panel.new()
-	bar.custom_minimum_size = Vector2(0, 22)
+	var bar = Control.new()
+	bar.custom_minimum_size = Vector2(0, 26)
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tbg = ColorRect.new()
+	tbg.color = Color(0.18, 0.18, 0.20, 1.0)
+	tbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bar.add_child(tbg)
+	var center = CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bar.add_child(center)
 	var hbox = HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 2)
-	bar.add_child(hbox)
+	center.add_child(hbox)
 	vbox.add_child(bar)
 
 	var lbl = Label.new()
@@ -178,19 +191,15 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(lbl)
 
-	# Buttons — flat style, no nesting
 	for item in [
 		["_", func(): _toggle_minimize(root)],
 		["✕", func(): _kill(_find_body(root))],
 	]:
 		var btn = Button.new()
-		btn.text = item[0]
-		btn.flat = true
+		btn.text = item[0]; btn.flat = true; btn.focus_mode = Control.FOCUS_NONE
 		btn.custom_minimum_size = Vector2(22, 18)
-		btn.pressed.connect(item[1])
-		hbox.add_child(btn)
+		btn.pressed.connect(item[1]); hbox.add_child(btn)
 
-	# Terminal body
 	var term = load("res://scenes/terminal_pane.gd").new()
 	term.name = "Body"
 	term.shell_command = shell if shell != "" else DEFAULT_SHELL
@@ -198,6 +207,8 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	term.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	term.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(term)
+
+	term.title_changed.connect(func(t: String): lbl.text = " " + t)
 
 	return root
 
@@ -227,31 +238,36 @@ func _toggle_minimize(w: Control):
 # ═══════════════════════════════════════════════════════════════════════
 
 func _build_sidebar():
-	# ColorRect as visible sidebar background — impossible to miss
-	var bg = ColorRect.new()
-	bg.name = "SidebarBg"
-	bg.color = Color(0.12, 0.12, 0.15, 1.0)
-	bg.size = Vector2(180, 0)
-	bg.anchor_top = 0.0; bg.anchor_bottom = 1.0
-	bg.anchor_right = 0.0
-	add_child(bg)
+	var sbg = ColorRect.new()
+	sbg.name = "SidebarBg"; sbg.color = Color(0.12, 0.12, 0.15, 1.0)
+	sbg.size = Vector2(180, 0); sbg.anchor_top = 0.0; sbg.anchor_bottom = 1.0; sbg.anchor_right = 0.0
+	add_child(sbg)
+	_sidebar_bg = sbg
 
-	# VBoxContainer for content, overlaid on the ColorRect
 	_sidebar = Control.new()
 	_sidebar.offset_right = 180
-	_sidebar.anchor_top = 0.0; _sidebar.anchor_bottom = 1.0
+	_sidebar.clip_contents = true; _sidebar.anchor_top = 0.0; _sidebar.anchor_bottom = 1.0
 	add_child(_sidebar)
 
-	var v = VBoxContainer.new()
+	var v = VBoxContainer.new(); v.name = "SidebarContent"
 	v.add_theme_constant_override("separation", 4)
 	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_sidebar.add_child(v)
 
-	v.add_child(_lbl(" godopty", 16))
+	var header = HBoxContainer.new(); header.name = "Header"
+	header.add_theme_constant_override("separation", 0)
+	var title = _lbl(" godopty", 16)
+	title.name = "SidebarTitle"; title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	var arrow = Button.new()
+	arrow.text = "◀"; arrow.name = "SidebarArrow"
+	arrow.custom_minimum_size = Vector2(22, 22)
+	arrow.pressed.connect(_toggle_sidebar)
+	header.add_child(arrow)
+	v.add_child(header)
 
 	for b in [
 		["+ Terminal", func(): var p = _spawn(); if p: p.grab_focus()],
-		["✕ Close Active", _kill_last],
 		["↺ Reset", _reset],
 	]:
 		var btn = Button.new(); btn.text = b[0]
@@ -259,24 +275,30 @@ func _build_sidebar():
 		btn.pressed.connect(b[1]); v.add_child(btn)
 
 	v.add_child(_lbl(" Panes:", 12))
-	var sc = ScrollContainer.new(); sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(sc)
+	var sc = ScrollContainer.new(); sc.name = "PaneScroll"
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(sc)
 	var pl = VBoxContainer.new(); pl.name = "PaneList"
-	pl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sc.add_child(pl)
-
-	var sp = Control.new(); sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(sp)
+	pl.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sc.add_child(pl)
 
 	for b in [["Save", _save], ["Load", _restore]]:
 		var btn = Button.new(); btn.text = b[0]; btn.pressed.connect(b[1]); v.add_child(btn)
+
+	# Collapsed-state button — direct child of sidebar, only visible when collapsed
+	var coll_btn = Button.new()
+	coll_btn.text = "▶"; coll_btn.name = "SidebarCollapsedBtn"
+	coll_btn.custom_minimum_size = Vector2(18, 22)
+	coll_btn.offset_left = 1; coll_btn.offset_top = 2
+	coll_btn.offset_right = 19; coll_btn.visible = false
+	coll_btn.pressed.connect(_toggle_sidebar)
+	_sidebar.add_child(coll_btn)
 
 func _lbl(t: String, s: int) -> Label:
 	var l = Label.new(); l.text = t; l.add_theme_font_size_override("font_size", s); return l
 
 func _list():
-	var pl = _sidebar.get_node_or_null("VBoxContainer/ScrollContainer/PaneList")
-	if pl == null: return
+	var pl = _sidebar.get_node_or_null("SidebarContent/PaneScroll/PaneList")
+	if pl == null: print("[sidebar] PaneList not found!"); return
+	print("[sidebar] listing ", _tiles.size(), " panes")
 	for c in pl.get_children(): c.queue_free()
 	for i in _tiles.size():
 		var body = _find_body(_tiles[i].wrapper)
@@ -293,12 +315,22 @@ func _list():
 
 func _toggle_sidebar():
 	_sidebar_on = not _sidebar_on
+	var content = _sidebar.get_node_or_null("SidebarContent")
+	var title = _sidebar.get_node_or_null("SidebarContent/Header/SidebarTitle")
+	var a = _sidebar.get_node_or_null("SidebarArrow")
+	var coll = _sidebar.get_node_or_null("SidebarCollapsedBtn")
 	if _sidebar_on:
-		_sidebar.show()
-		var bg = get_node_or_null("SidebarBg"); if bg: bg.show()
+		_sidebar.offset_right = 180; _sidebar_bg.size.x = 180
+		if content: content.show()
+		if title: title.visible = true
+		if a: a.visible = true
+		if coll: coll.visible = false
 	else:
-		_sidebar.hide()
-		var bg = get_node_or_null("SidebarBg"); if bg: bg.hide()
+		_sidebar.offset_right = 20; _sidebar_bg.size.x = 20
+		if content: content.hide()
+		if title: title.visible = false
+		if a: a.visible = false
+		if coll: coll.visible = true
 	_apply_layout()
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -346,18 +378,16 @@ func _restore():
 
 func _input(event):
 	if not (event is InputEventKey and event.pressed): return
-	# Emergency reset: Ctrl+Shift+R
 	if event.keycode == KEY_R and event.ctrl_pressed and event.shift_pressed:
-		_sidebar.show(); _sidebar_on = true
+		_sidebar_on = true; _sidebar.show(); _sidebar_bg.show()
 		_reset(); _apply_layout(); _list()
-		print("[Workspace] Emergency reset")
 		return
 	if event.ctrl_pressed and not event.shift_pressed and not event.alt_pressed:
 		match event.keycode:
-			KEY_N: var p = _spawn(); if p: p.grab_focus()
-			KEY_W: _kill_last()
-			KEY_B: _toggle_sidebar()
-			KEY_P: _toggle_palette()
+			KEY_N: var p = _spawn(); if p: p.grab_focus(); accept_event()
+			KEY_W: _kill_last(); accept_event()
+			KEY_B: _toggle_sidebar(); accept_event()
+			KEY_P: _toggle_palette(); accept_event()
 
 func _toggle_palette():
 	if _palette == null: _palette = _build_palette(); add_child(_palette)
@@ -365,8 +395,7 @@ func _toggle_palette():
 	if _palette.visible: _palette.get_node("LineEdit").grab_focus()
 
 func _build_palette() -> Control:
-	var bg = Panel.new(); bg.size = Vector2(350, 240)
-	bg.position = (size - bg.size) * 0.5
+	var bg = Panel.new(); bg.size = Vector2(350, 240); bg.position = (size - bg.size) * 0.5
 	var v = VBoxContainer.new(); bg.add_child(v)
 	var inp = LineEdit.new(); inp.placeholder_text = "Command..."; v.add_child(inp)
 	var lst = ItemList.new(); lst.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(lst)
@@ -385,7 +414,7 @@ func _run(c: String):
 		"new terminal": var p = _spawn(); if p: p.grab_focus()
 		"close active": _kill_last()
 		"reset layout": _reset()
-		"save": _save()
+		"save": _save();
 		"load": _restore()
 		_: if "new" in c: var p = _spawn(); if p: p.grab_focus()
 		elif "close" in c: _kill_last()
