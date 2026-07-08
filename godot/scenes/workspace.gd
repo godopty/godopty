@@ -229,6 +229,7 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 
 func _make_vbox() -> VBoxContainer:
 	var v = VBoxContainer.new()
+	v.name = "BodyVBox"
 	v.add_theme_constant_override("separation", 0)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -267,7 +268,7 @@ func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Labe
 	return lbl
 
 func _find_body(w: Control) -> Control:
-	return w.get_node_or_null("VBoxContainer/Body")
+	return w.get_node_or_null("BodyVBox/Body")
 
 func _show_message(msg: String):
 	var lbl = Label.new()
