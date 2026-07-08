@@ -210,12 +210,31 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	sb.border_color = WRAPPER_BORDER_COLOR
 	root.add_theme_stylebox_override("panel", sb)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 0)
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var vbox = _make_vbox()
 	root.add_child(vbox)
 
+	var lbl = _add_title_bar(vbox, shell, root)
+
+	var term = TerminalPaneScript.new()
+	term.name = "Body"
+	term.shell_command = shell if shell != "" else DEFAULT_SHELL
+	term.rows = rows; term.cols = cols
+	term.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	term.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(term)
+
+	term.title_changed.connect(func(t: String): lbl.text = " " + t)
+
+	return root
+
+func _make_vbox() -> VBoxContainer:
+	var v = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	return v
+
+func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Label:
 	var bar = Control.new()
 	bar.custom_minimum_size = Vector2(0, TITLE_BAR_HEIGHT)
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -229,7 +248,7 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	var hbox = HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 2)
 	center.add_child(hbox)
-	vbox.add_child(bar)
+	parent.add_child(bar)
 
 	var lbl = Label.new()
 	lbl.text = " " + (shell.get_file() if shell else "terminal")
@@ -245,17 +264,7 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 		btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 		btn.pressed.connect(item[1]); hbox.add_child(btn)
 
-	var term = TerminalPaneScript.new()
-	term.name = "Body"
-	term.shell_command = shell if shell != "" else DEFAULT_SHELL
-	term.rows = rows; term.cols = cols
-	term.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	term.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(term)
-
-	term.title_changed.connect(func(t: String): lbl.text = " " + t)
-
-	return root
+	return lbl
 
 func _find_body(w: Control) -> Control:
 	return w.get_node_or_null("VBoxContainer/Body")
@@ -280,12 +289,7 @@ func _toggle_minimize(w: Control):
 # ═══════════════════════════════════════════════════════════════════════
 
 func _build_sidebar():
-	var sbg = ColorRect.new()
-	sbg.name = "SidebarBg"; sbg.color = SIDEBAR_BG_COLOR
-	sbg.size = Vector2(SIDEBAR_WIDTH, 0); sbg.anchor_top = 0.0; sbg.anchor_bottom = 1.0; sbg.anchor_right = 0.0
-	add_child(sbg)
-	_sidebar_bg = sbg
-
+	_sidebar_bg = _make_sidebar_bg()
 	_sidebar = Control.new()
 	_sidebar.offset_right = SIDEBAR_WIDTH
 	_sidebar.clip_contents = true; _sidebar.anchor_top = 0.0; _sidebar.anchor_bottom = 1.0
@@ -296,18 +300,33 @@ func _build_sidebar():
 	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_sidebar.add_child(v)
 
-	var header = HBoxContainer.new(); header.name = "Header"
-	header.add_theme_constant_override("separation", 0)
+	_add_sidebar_header(v)
+	_add_sidebar_buttons(v)
+	_add_pane_list(v)
+	_add_sidebar_action_buttons(v)
+	_add_collapsed_button()
+
+func _make_sidebar_bg() -> ColorRect:
+	var bg = ColorRect.new()
+	bg.name = "SidebarBg"; bg.color = SIDEBAR_BG_COLOR
+	bg.size = Vector2(SIDEBAR_WIDTH, 0); bg.anchor_top = 0.0; bg.anchor_bottom = 1.0; bg.anchor_right = 0.0
+	add_child(bg)
+	return bg
+
+func _add_sidebar_header(v: VBoxContainer):
+	var h = HBoxContainer.new(); h.name = "Header"
+	h.add_theme_constant_override("separation", 0)
 	var title = _lbl(" godopty", 16)
 	title.name = "SidebarTitle"; title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
+	h.add_child(title)
 	var arrow = Button.new()
 	arrow.text = "◀"; arrow.name = "SidebarArrow"
 	arrow.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_WIDTH)
 	arrow.pressed.connect(_toggle_sidebar)
-	header.add_child(arrow)
-	v.add_child(header)
+	h.add_child(arrow)
+	v.add_child(h)
 
+func _add_sidebar_buttons(v: VBoxContainer):
 	for b in [
 		["+ Terminal", func(): var p = _spawn(); if p: p.grab_focus()],
 		["⚙ Settings", _open_settings],
@@ -317,23 +336,25 @@ func _build_sidebar():
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(b[1]); v.add_child(btn)
 
+func _add_pane_list(v: VBoxContainer):
 	v.add_child(_lbl(" Panes:", 12))
 	var sc = ScrollContainer.new(); sc.name = "PaneScroll"
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(sc)
 	var pl = VBoxContainer.new(); pl.name = "PaneList"
 	pl.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sc.add_child(pl)
 
+func _add_sidebar_action_buttons(v: VBoxContainer):
 	for b in [["Save", _save], ["Load", _restore]]:
 		var btn = Button.new(); btn.text = b[0]; btn.pressed.connect(b[1]); v.add_child(btn)
 
-	# Collapsed-state button — direct child of sidebar, only visible when collapsed
-	var coll_btn = Button.new()
-	coll_btn.text = "▶"; coll_btn.name = "SidebarCollapsedBtn"
-	coll_btn.custom_minimum_size = Vector2(BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH)
-	coll_btn.offset_left = 1; coll_btn.offset_top = 2
-	coll_btn.offset_right = 19; coll_btn.visible = false
-	coll_btn.pressed.connect(_toggle_sidebar)
-	_sidebar.add_child(coll_btn)
+func _add_collapsed_button():
+	var btn = Button.new()
+	btn.text = "▶"; btn.name = "SidebarCollapsedBtn"
+	btn.custom_minimum_size = Vector2(BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH)
+	btn.offset_left = 1; btn.offset_top = 2
+	btn.offset_right = 19; btn.visible = false
+	btn.pressed.connect(_toggle_sidebar)
+	_sidebar.add_child(btn)
 
 func _lbl(t: String, s: int) -> Label:
 	var l = Label.new(); l.text = t; l.add_theme_font_size_override("font_size", s); return l
@@ -463,35 +484,10 @@ func _build_settings() -> Control:
 	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.add_child(v)
 
-	var h = HBoxContainer.new()
-	var t = Label.new(); t.text = "Global Settings"; t.add_theme_font_size_override("font_size", 18)
-	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(t)
-	var x = Button.new(); x.text = "X"; x.flat = true
-	x.pressed.connect(func(): _settings_panel.visible = false); h.add_child(x)
-	v.add_child(h)
-
-	# Cursor shape
-	var hs = HBoxContainer.new()
-	hs.add_child(_lbl("Cursor:", 13))
-	var shape_opt = OptionButton.new(); shape_opt.name = "ShapeOpt"
-	shape_opt.add_item("Block"); shape_opt.add_item("Underline"); shape_opt.add_item("Beam")
-	shape_opt.selected = _cfg_cursor_shape
-	hs.add_child(shape_opt)
-	v.add_child(hs)
-
-	# Cursor blink
-	var blink_cb = CheckBox.new(); blink_cb.name = "BlinkCb"; blink_cb.text = " Cursor blink"
-	blink_cb.button_pressed = _cfg_cursor_blink
-	v.add_child(blink_cb)
-
-	# Font size
-	var hf = HBoxContainer.new()
-	hf.add_child(_lbl("Font size:", 13))
-	var fs_spin = SpinBox.new(); fs_spin.name = "FontSpin"
-	fs_spin.min_value = MIN_FONT_SIZE; fs_spin.max_value = MAX_FONT_SIZE
-	fs_spin.value = _cfg_font_size
-	hf.add_child(fs_spin)
-	v.add_child(hf)
+	_add_settings_header(v)
+	var shape_opt = _add_cursor_control(v)
+	var blink_cb = _add_blink_control(v)
+	var fs_spin = _add_font_control(v)
 
 	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
 	# only trigger one save + propagate cycle.
@@ -509,8 +505,50 @@ func _build_settings() -> Control:
 	fs_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
 
 	# Reset
-	var reset = Button.new(); reset.text = "Reset to defaults"
-	reset.pressed.connect(func():
+	_add_reset_button(v, shape_opt, blink_cb, fs_spin)
+
+	bg.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
+			_settings_panel.visible = false)
+	return bg
+
+func _add_settings_header(v: VBoxContainer):
+	var h = HBoxContainer.new()
+	var t = Label.new(); t.text = "Global Settings"; t.add_theme_font_size_override("font_size", 18)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(t)
+	var x = Button.new(); x.text = "X"; x.flat = true
+	x.pressed.connect(func(): _settings_panel.visible = false); h.add_child(x)
+	v.add_child(h)
+
+func _add_cursor_control(v: VBoxContainer) -> OptionButton:
+	var hs = HBoxContainer.new()
+	hs.add_child(_lbl("Cursor:", 13))
+	var opt = OptionButton.new(); opt.name = "ShapeOpt"
+	opt.add_item("Block"); opt.add_item("Underline"); opt.add_item("Beam")
+	opt.selected = _cfg_cursor_shape
+	hs.add_child(opt)
+	v.add_child(hs)
+	return opt
+
+func _add_blink_control(v: VBoxContainer) -> CheckBox:
+	var cb = CheckBox.new(); cb.name = "BlinkCb"; cb.text = " Cursor blink"
+	cb.button_pressed = _cfg_cursor_blink
+	v.add_child(cb)
+	return cb
+
+func _add_font_control(v: VBoxContainer) -> SpinBox:
+	var hf = HBoxContainer.new()
+	hf.add_child(_lbl("Font size:", 13))
+	var spin = SpinBox.new(); spin.name = "FontSpin"
+	spin.min_value = MIN_FONT_SIZE; spin.max_value = MAX_FONT_SIZE
+	spin.value = _cfg_font_size
+	hf.add_child(spin)
+	v.add_child(hf)
+	return spin
+
+func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, fs_spin: SpinBox):
+	var btn = Button.new(); btn.text = "Reset to defaults"
+	btn.pressed.connect(func():
 		_cfg_cursor_shape = 0
 		_cfg_cursor_blink = true
 		_cfg_font_size = 14
@@ -520,12 +558,7 @@ func _build_settings() -> Control:
 		fs_spin.value = 14
 		var all2 = []; _collect_bodies(all2)
 		for body in all2: _apply_settings_to(body))
-	v.add_child(reset)
-
-	bg.gui_input.connect(func(ev: InputEvent):
-		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
-			_settings_panel.visible = false)
-	return bg
+	v.add_child(btn)
 
 func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int):
 	_cfg_cursor_shape = cursor_shape

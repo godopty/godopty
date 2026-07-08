@@ -139,7 +139,28 @@ func _draw():
 	var baseline = _font.get_ascent(font_size)
 
 	draw_rect(Rect2(Vector2.ZERO, size), default_bg)
+	_draw_cells(off, baseline)
 
+	# Focus border
+	if has_focus():
+		draw_rect(Rect2(0, 0, size.x, size.y), FOCUS_BORDER_COLOR, false, FOCUS_BORDER_WIDTH)
+
+	# Cursor
+	if _cursor_visible:
+		_draw_cursor(off, baseline)
+
+	# Scrollback indicator
+	var so = _terminal.get_scroll_offset()
+	if so > 0:
+		draw_string(_font, Vector2(off.x + _cell_w * 0.5, off.y + _cell_h * 0.5),
+			"[Scroll: %d/%d lines]" % [so, _terminal.get_history_size()],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, SCROLLBACK_INDICATOR_COLOR)
+
+	# Selection
+	if _sel_start.x >= 0 and _sel_end.x >= 0:
+		_draw_selection(off)
+
+func _draw_cells(off: Vector2, baseline: float):
 	for r in _cell_cache.size():
 		var row: Array = _cell_cache[r]
 		for c in row.size():
@@ -160,55 +181,39 @@ func _draw():
 			if cell.get("underline", false):
 				draw_line(Vector2(x, y + baseline + 2), Vector2(x + _cell_w, y + baseline + 2), fg, 1.0)
 
-	# Focus border
-	if has_focus():
-		draw_rect(Rect2(0, 0, size.x, size.y), FOCUS_BORDER_COLOR, false, FOCUS_BORDER_WIDTH)
+func _draw_cursor(off: Vector2, baseline: float):
+	var cr = _terminal.get_cursor_row(); var cc = _terminal.get_cursor_col()
+	if cr < 0 or cc < 0: return
+	var cx = off.x + cc * _cell_w; var cy = off.y + cr * _cell_h
+	var cursor_ch = ""
+	if cr < _cell_cache.size():
+		var rw: Array = _cell_cache[cr]
+		if cc < rw.size(): cursor_ch = rw[cc]["ch"]
 
-	# Cursor
-	if _cursor_visible:
-		var cr = _terminal.get_cursor_row(); var cc = _terminal.get_cursor_col()
-		if cr >= 0 and cc >= 0:
-			var cx = off.x + cc * _cell_w; var cy = off.y + cr * _cell_h
-			var cursor_ch = ""
-			if cr < _cell_cache.size():
-				var rw: Array = _cell_cache[cr]
-				if cc < rw.size(): cursor_ch = rw[cc]["ch"]
+	match cursor_shape:
+		0:
+			draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
+			if cursor_ch != " " and cursor_ch != "":
+				draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
+		1:
+			draw_rect(Rect2(cx, cy + _cell_h - UNDERLINE_CURSOR_HEIGHT, _cell_w, UNDERLINE_CURSOR_HEIGHT), cursor_color)
+		2:
+			draw_rect(Rect2(cx, cy, BEAM_CURSOR_WIDTH, _cell_h), cursor_color)
+		_:
+			draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
+			if cursor_ch != " " and cursor_ch != "":
+				draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
 
-			match cursor_shape:
-				0:
-					draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
-					if cursor_ch != " " and cursor_ch != "":
-						draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
-				1:
-					draw_rect(Rect2(cx, cy + _cell_h - UNDERLINE_CURSOR_HEIGHT, _cell_w, UNDERLINE_CURSOR_HEIGHT), cursor_color)
-				2:
-					draw_rect(Rect2(cx, cy, BEAM_CURSOR_WIDTH, _cell_h), cursor_color)
-				_:
-					draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
-					if cursor_ch != " " and cursor_ch != "":
-						draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
+func _draw_selection(off: Vector2):
+	var sr0 = mini(_sel_start.y, _sel_end.y); var sr1 = maxi(_sel_start.y, _sel_end.y)
+	var sc0 = mini(_sel_start.x, _sel_end.x); var sc1 = maxi(_sel_start.x, _sel_end.x)
+	for r in range(sr0, sr1 + 1):
+		if r < 0 or r >= _cell_cache.size(): continue
+		var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1) + 1
+		for c in range(cb, ce):
+			if c >= 0 and c < cols:
+				draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), SELECTION_COLOR)
 
-	# Scrollback
-	var so = _terminal.get_scroll_offset()
-	if so > 0:
-		draw_string(_font, Vector2(off.x + _cell_w * 0.5, off.y + _cell_h * 0.5),
-			"[Scroll: %d/%d lines]" % [so, _terminal.get_history_size()],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, SCROLLBACK_INDICATOR_COLOR)
-
-	# Selection
-	if _sel_start.x >= 0 and _sel_end.x >= 0:
-		var sr0 = mini(_sel_start.y, _sel_end.y); var sr1 = maxi(_sel_start.y, _sel_end.y)
-		var sc0 = mini(_sel_start.x, _sel_end.x); var sc1 = maxi(_sel_start.x, _sel_end.x)
-		for r in range(sr0, sr1 + 1):
-			if r < 0 or r >= _cell_cache.size(): continue
-			var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1) + 1
-			for c in range(cb, ce):
-				if c >= 0 and c < cols:
-					draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), SELECTION_COLOR)
-
-func _mouse_to_cell(pos: Vector2) -> Vector2i:
-	var off = _grid_offset()
-	return Vector2i(int((pos.x - off.x) / _cell_w), int((pos.y - off.y) / _cell_h))
 
 func _get_selected_text() -> String:
 	if _sel_start.x < 0 or _sel_end.x < 0 or _cell_cache.is_empty(): return ""
@@ -226,6 +231,12 @@ func _get_selected_text() -> String:
 	return "\n".join(lines)
 
 func _gui_input(event):
+	if event is InputEventMouseButton or event is InputEventMouseMotion:
+		_handle_mouse(event)
+	elif event is InputEventKey and event.pressed:
+		_handle_keyboard(event)
+
+func _handle_mouse(event: InputEvent):
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
@@ -237,23 +248,27 @@ func _gui_input(event):
 	if event is InputEventMouseMotion and _selecting:
 		_sel_end = _mouse_to_cell(event.position); queue_redraw()
 
-	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_C and event.ctrl_pressed and event.shift_pressed:
-			var st = _get_selected_text()
-			if st != "": DisplayServer.clipboard_set(st)
-			_sel_start = Vector2i(-1, -1); _sel_end = Vector2i(-1, -1); queue_redraw(); accept_event(); return
-		if event.keycode == KEY_V and event.ctrl_pressed and event.shift_pressed:
-			var cl = DisplayServer.clipboard_get()
-			if cl != "": _terminal.send_text(cl)
-			accept_event(); return
-		_sel_start = Vector2i(-1, -1); _sel_end = Vector2i(-1, -1)
-		if event.keycode == KEY_PAGEUP: _terminal.scroll_up(rows); accept_event(); return
-		if event.keycode == KEY_PAGEDOWN: _terminal.scroll_down(rows); accept_event(); return
-		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
-			_terminal.send_line(""); _terminal.scroll_reset(); accept_event(); return
-		_terminal.scroll_reset()
-		var tx = _key_to_text(event)
-		if tx != "": _terminal.send_text(tx); accept_event()
+func _handle_keyboard(event: InputEventKey):
+	if event.keycode == KEY_C and event.ctrl_pressed and event.shift_pressed:
+		var st = _get_selected_text()
+		if st != "": DisplayServer.clipboard_set(st)
+		_sel_start = Vector2i(-1, -1); _sel_end = Vector2i(-1, -1); queue_redraw(); accept_event(); return
+	if event.keycode == KEY_V and event.ctrl_pressed and event.shift_pressed:
+		var cl = DisplayServer.clipboard_get()
+		if cl != "": _terminal.send_text(cl)
+		accept_event(); return
+	_sel_start = Vector2i(-1, -1); _sel_end = Vector2i(-1, -1)
+	if event.keycode == KEY_PAGEUP: _terminal.scroll_up(rows); accept_event(); return
+	if event.keycode == KEY_PAGEDOWN: _terminal.scroll_down(rows); accept_event(); return
+	if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+		_terminal.send_line(""); _terminal.scroll_reset(); accept_event(); return
+	_terminal.scroll_reset()
+	var tx = _key_to_text(event)
+	if tx != "": _terminal.send_text(tx); accept_event()
+
+func _mouse_to_cell(pos: Vector2) -> Vector2i:
+	var off = _grid_offset()
+	return Vector2i(int((pos.x - off.x) / _cell_w), int((pos.y - off.y) / _cell_h))
 
 func _key_to_text(event: InputEventKey) -> String:
 	if event.unicode >= PRINTABLE_ASCII_MIN and event.unicode <= PRINTABLE_ASCII_MAX: return char(event.unicode)
