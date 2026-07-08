@@ -235,6 +235,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Drag-to-resize tile edges** — grab grid lines to resize panes (needs sub-grid positioning, deferred until pane type rewrite)
 - [ ] **Standalone mode** — test and fix canvas resizing outside the embedded editor
 - [ ] **Tab/workspace switching** — multiple named workspaces per session
+- [ ] **ESC to dismiss settings panel** — `gui_input` on the settings panel background is not receiving key events; the ESC handler is wired but never fires
 - [ ] **Title bar right-click menu** — split/close/move options
 
 ### Pane Types
