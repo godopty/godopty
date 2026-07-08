@@ -269,7 +269,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
 
 ### User Settings
-- [ ] **Cursor blink speed** — make the blink interval configurable (currently 0.5 s)
+- [ ] ~~**Cursor blink speed**~~ — added `cursor_blink_speed` setting (0.1–2.0 s, persisted to settings.json)
 - [ ] **Scroll wheel sensitivity** — make scroll lines-per-tick configurable (currently 3)
 - [ ] **Default terminal dimensions** — make new-pane rows×cols configurable (currently 24×80)
 - [ ] **Cursor thickness** — configurable beam cursor width (2 px) and underline height (3 px)

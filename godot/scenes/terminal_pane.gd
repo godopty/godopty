@@ -32,6 +32,7 @@ const PRINTABLE_ASCII_MAX = 126
 @export var cursor_shape: int = 0
 @export var cursor_color: Color = Color(0.8, 0.8, 0.8, 0.7)
 @export var cursor_blink: bool = true
+@export var cursor_blink_speed: float = CURSOR_BLINK_INTERVAL
 
 @export var default_fg: Color = Color(0.8, 0.8, 0.8)
 @export var default_bg: Color = Color(0.12, 0.12, 0.12)
@@ -97,7 +98,7 @@ func _recompute_cell_metrics():
 func _process(delta):
 	if cursor_blink:
 		_cursor_blink_timer += delta
-		if _cursor_blink_timer > CURSOR_BLINK_INTERVAL:
+		if _cursor_blink_timer > cursor_blink_speed:
 			_cursor_blink_timer = 0.0
 			_cursor_visible = not _cursor_visible
 	else:
