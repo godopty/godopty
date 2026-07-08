@@ -56,7 +56,7 @@ var _sidebar_on := true
 var _palette: Control
 var _grid: Control
 var _last_body: Control
-var _tiles: Array = []  # [{wrapper, col, row, cspan, rspan}]
+var _tiles: Array[Dictionary] = []  # [{wrapper, col, row, cspan, rspan}]
 
 func _ready():
 	show()
@@ -361,7 +361,7 @@ func _add_collapsed_button():
 func _lbl(t: String, s: int) -> Label:
 	var l = Label.new(); l.text = t; l.add_theme_font_size_override("font_size", s); return l
 
-func _collect_bodies(out: Array):
+func _collect_bodies(out: Array[Control]):
 	for t in _tiles:
 		var body = _find_body(t.wrapper)
 		if body: out.append(body)

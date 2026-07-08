@@ -122,6 +122,7 @@ impl TermGrid {
     /// state, etc.). Call this whenever new bytes arrive from the PTY
     /// read thread.
     pub fn feed(&mut self, bytes: &[u8]) {
+        self.generation += 1;
         self.processor.advance(&mut self.term, bytes);
     }
 
@@ -338,6 +339,35 @@ mod tests {
         g.resize(30, 100);
         assert_eq!(g.num_rows(), 30);
         assert_eq!(g.num_cols(), 100);
+    }
+
+    #[test]
+    fn generation_increments_on_feed() {
+        let mut g = TermGrid::new(5, 20);
+        let gen_before = g.generation;
+        g.feed(b"hello");
+        assert_eq!(g.generation, gen_before + 1);
+        g.feed(b" world");
+        assert_eq!(g.generation, gen_before + 2);
+    }
+
+    #[test]
+    fn generation_increments_on_resize() {
+        let mut g = TermGrid::new(24, 80);
+        let gen_before = g.generation;
+        g.resize(30, 100);
+        assert_eq!(g.generation, gen_before + 1);
+    }
+
+    #[test]
+    fn generation_unchanged_on_scroll() {
+        let mut g = TermGrid::new(5, 20);
+        g.feed(b"line1\r\nline2\r\nline3\r\n");
+        let gen_after_feed = g.generation;
+        g.scroll_up(1);
+        g.scroll_down(1);
+        g.scroll_reset();
+        assert_eq!(g.generation, gen_after_feed, "scroll operations should not change generation");
     }
 
     #[test]
