@@ -8,7 +8,11 @@ extends Node2D
 @export var shell_command: String = "/bin/bash"
 @export var rows: int = 24
 @export var cols: int = 80
-@export var font_size: int = 14
+@export var font_size: int = 14:
+	set(value):
+		font_size = value
+		if _font != null:
+			_recompute_cell_metrics()
 
 # ── Font ────────────────────────────────────────────────────────────
 ## Path to a .ttf monospace font. Leave empty to use the bundled DejaVu Sans Mono.
@@ -55,8 +59,7 @@ func _ready():
 	_font_bold = _load_font(font_bold_path, "res://fonts/DejaVuSansMono-Bold.ttf")
 	_font_italic = _load_font(font_italic_path, "res://fonts/DejaVuSansMono-Oblique.ttf")
 
-	_cell_w = _font.get_char_size('W'.unicode_at(0), font_size).x
-	_cell_h = _font.get_height(font_size)
+	_recompute_cell_metrics()
 
 func _load_font(path: String, fallback: String) -> Font:
 	var f: Font
@@ -66,6 +69,13 @@ func _load_font(path: String, fallback: String) -> Font:
 		f = load(fallback)
 	f.fixed_size = font_size
 	return f
+
+func _recompute_cell_metrics():
+	_font.fixed_size = font_size
+	_font_bold.fixed_size = font_size
+	_font_italic.fixed_size = font_size
+	_cell_w = _font.get_char_size('W'.unicode_at(0), font_size).x
+	_cell_h = _font.get_height(font_size)
 
 func _process(delta):
 	if cursor_blink:
