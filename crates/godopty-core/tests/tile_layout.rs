@@ -117,8 +117,9 @@ fn expand_partial(tiles: &mut Vec<Tile>, rm: &Tile) {
             tiles[i].cspan = new_right - tiles[i].col;
         }
         for &i in &right {
+            let old_right = tiles[i].col + tiles[i].cspan;
             tiles[i].col = rm.col;
-            tiles[i].cspan = (tiles[i].col + tiles[i].cspan) - rm.col;
+            tiles[i].cspan = old_right - rm.col;
         }
         return;
     }
@@ -128,8 +129,9 @@ fn expand_partial(tiles: &mut Vec<Tile>, rm: &Tile) {
             tiles[i].rspan = new_bottom - tiles[i].row;
         }
         for &i in &down {
+            let old_bottom = tiles[i].row + tiles[i].rspan;
             tiles[i].row = rm.row;
-            tiles[i].rspan = (tiles[i].row + tiles[i].rspan) - rm.row;
+            tiles[i].rspan = old_bottom - rm.row;
         }
         return;
     }
@@ -310,6 +312,46 @@ mod tests {
         // Both T1 and T3 should be full width
         for t in &tiles {
             assert_eq!(t.cspan, GRID);
+        }
+    }
+
+    #[test]
+    fn partial_expand_right_covers_removed_tile() {
+        // T1(0,0,4,12) left, T2(4,0,8,6) top-right, T3(4,6,8,6) bottom-right.
+        // Remove T1 — T2 and T3 should expand left to fill the gap.
+        let mut tiles = vec![
+            Tile { col: 0, row: 0, cspan: 4, rspan: GRID },
+            Tile { col: 4, row: 0, cspan: 8, rspan: 6 },
+            Tile { col: 4, row: 6, cspan: 8, rspan: 6 },
+        ];
+        kill_tile(&mut tiles, 0); // remove left tile
+        assert_eq!(tiles.len(), 2);
+        assert!(no_overlap(&tiles));
+        assert!(full_coverage(&tiles));
+        // Both should now start at col 0 and span the full width
+        for t in &tiles {
+            assert_eq!(t.col, 0);
+            assert_eq!(t.cspan, GRID);
+        }
+    }
+
+    #[test]
+    fn partial_expand_down_covers_removed_tile() {
+        // T1(0,0,12,4) top, T2(0,4,6,8) bottom-left, T3(6,4,6,8) bottom-right.
+        // Remove T1 — T2 and T3 should expand up to fill the gap.
+        let mut tiles = vec![
+            Tile { col: 0, row: 0, cspan: GRID, rspan: 4 },
+            Tile { col: 0, row: 4, cspan: 6, rspan: 8 },
+            Tile { col: 6, row: 4, cspan: 6, rspan: 8 },
+        ];
+        kill_tile(&mut tiles, 0); // remove top tile
+        assert_eq!(tiles.len(), 2);
+        assert!(no_overlap(&tiles));
+        assert!(full_coverage(&tiles));
+        // Both should now start at row 0 and span the full height
+        for t in &tiles {
+            assert_eq!(t.row, 0);
+            assert_eq!(t.rspan, GRID);
         }
     }
 }
