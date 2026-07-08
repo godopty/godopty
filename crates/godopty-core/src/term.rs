@@ -331,9 +331,23 @@ mod tests {
     fn scrollback_basic() {
         let mut g = TermGrid::new(3, 10);
         g.feed(b"line1\r\nline2\r\nline3\r\nline4\r\nline5\r\n");
-        assert!(g.history_size() > 0);
+        let hist = g.history_size();
+        assert_eq!(hist, 3, "5 lines + trailing CRLF = 3 history");
+        // Before scroll, visible rows should be the last 3 lines
+        let before: Vec<String> = g.renderable_rows().iter()
+            .map(|r| r.iter().map(|c| c.ch).collect::<String>().trim_end().to_string())
+            .collect();
+        assert_eq!(before[0], "line4", "visible row 0 before scroll");
+        assert_eq!(before[1], "line5", "visible row 1 before scroll");
+        assert_eq!(before[2], "", "visible row 2 before scroll");
+        // After scrolling up, we should see history
         g.scroll_up(2);
-        assert_eq!(g.display_offset(), 2);
+        let after: Vec<String> = g.renderable_rows().iter()
+            .map(|r| r.iter().map(|c| c.ch).collect::<String>().trim_end().to_string())
+            .collect();
+        assert_eq!(after[0], "line2", "row 0 after scroll_up(2)");
+        assert_eq!(after[1], "line3", "row 1 after scroll_up(2)");
+        assert_eq!(after[2], "line4", "row 2 after scroll_up(2)");
         g.scroll_reset();
         assert_eq!(g.display_offset(), 0);
     }
