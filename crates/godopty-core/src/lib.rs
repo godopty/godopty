@@ -35,3 +35,4 @@ pub mod engine;
 pub mod pty;
 pub mod parser;
 pub mod term;
+pub mod color;

@@ -18,8 +18,9 @@ use alacritty_terminal::grid::{Dimensions, Grid, Scroll};
 use alacritty_terminal::term::cell::Cell;
 use alacritty_terminal::term::cell::Flags;
 use alacritty_terminal::term::Config;
-use alacritty_terminal::vte::ansi::{Color, NamedColor};
 use alacritty_terminal::Term;
+
+use crate::color::color_to_rgb;
 
 /// A character cell ready for rendering.
 #[derive(Debug, Clone)]
@@ -257,95 +258,6 @@ impl CellInfo {
             italic: flags.contains(Flags::ITALIC),
             underline: flags.contains(Flags::UNDERLINE),
             inverse: flags.contains(Flags::INVERSE),
-        }
-    }
-}
-
-// ── Color conversion ───────────────────────────────────────────────────
-
-/// Convert an alacritty/vte `Color` to an `[R, G, B]` triplet.
-///
-/// Named colors use the standard xterm-256color palette. Indexed colors
-/// (256-color mode) are approximated. True-color is passed through
-/// directly.
-fn color_to_rgb(color: &Color) -> [u8; 3] {
-    match color {
-        Color::Named(named) => named_to_rgb(named),
-        Color::Spec(rgb) => [rgb.r, rgb.g, rgb.b],
-        Color::Indexed(idx) => indexed_to_rgb(*idx),
-    }
-}
-
-/// Map standard 16 ANSI named colors to approximate RGB values.
-fn named_to_rgb(named: &NamedColor) -> [u8; 3] {
-    match named {
-        NamedColor::Background => CellInfo::DEFAULT_BG,
-        NamedColor::Foreground => CellInfo::DEFAULT_FG,
-        NamedColor::Black => [0, 0, 0],
-        NamedColor::Red => [205, 0, 0],
-        NamedColor::Green => [0, 205, 0],
-        NamedColor::Yellow => [205, 205, 0],
-        NamedColor::Blue => [0, 0, 238],
-        NamedColor::Magenta => [205, 0, 205],
-        NamedColor::Cyan => [0, 205, 205],
-        NamedColor::White => [229, 229, 229],
-        NamedColor::BrightBlack => [127, 127, 127],
-        NamedColor::BrightRed => [255, 0, 0],
-        NamedColor::BrightGreen => [0, 255, 0],
-        NamedColor::BrightYellow => [255, 255, 0],
-        NamedColor::BrightBlue => [92, 92, 255],
-        NamedColor::BrightMagenta => [255, 0, 255],
-        NamedColor::BrightCyan => [0, 255, 255],
-        NamedColor::BrightWhite => [255, 255, 255],
-        NamedColor::BrightForeground => [255, 255, 255],
-        NamedColor::DimBlack => [0, 0, 0],
-        NamedColor::DimRed => [205, 0, 0],
-        NamedColor::DimGreen => [0, 205, 0],
-        NamedColor::DimYellow => [205, 205, 0],
-        NamedColor::DimBlue => [0, 0, 238],
-        NamedColor::DimMagenta => [205, 0, 205],
-        NamedColor::DimCyan => [0, 205, 205],
-        NamedColor::DimWhite => [229, 229, 229],
-        // Cursor, ViMode, search match — fall back to default foreground
-        _ => CellInfo::DEFAULT_FG,
-    }
-}
-
-/// Approximate a 256-color palette index to an RGB triplet.
-///
-/// Colors 0–15 are system colors, 16–231 form a 6×6×6 RGB cube, and
-/// 232–255 form a grayscale ramp. This follows the standard xterm
-/// 256-color palette.
-fn indexed_to_rgb(idx: u8) -> [u8; 3] {
-    match idx {
-        0 => [0, 0, 0],
-        1 => [205, 0, 0],
-        2 => [0, 205, 0],
-        3 => [205, 205, 0],
-        4 => [0, 0, 238],
-        5 => [205, 0, 205],
-        6 => [0, 205, 205],
-        7 => [229, 229, 229],
-        8 => [127, 127, 127],
-        9 => [255, 0, 0],
-        10 => [0, 255, 0],
-        11 => [255, 255, 0],
-        12 => [92, 92, 255],
-        13 => [255, 0, 255],
-        14 => [0, 255, 255],
-        15 => [255, 255, 255],
-        // 16–231: 6×6×6 color cube
-        n if n < 232 => {
-            let n = n - 16;
-            let r = (n / 36) * 51;
-            let g = ((n / 6) % 6) * 51;
-            let b = (n % 6) * 51;
-            [r, g, b]
-        }
-        // 232–255: grayscale ramp (8 to 238 in steps of 10)
-        n => {
-            let gray = (n as u16 - 232) * 10 + 8;
-            [gray as u8, gray as u8, gray as u8]
         }
     }
 }
