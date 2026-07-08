@@ -118,51 +118,21 @@ impl WorkspaceEngine {
         command: &str,
         args: &[&str],
     ) -> Result<PtyTerminalHandle, Box<dyn std::error::Error + Send + Sync>> {
-        let (pty_tx, mut pty_rx) = mpsc::unbounded_channel::<Vec<u8>>();
-        let mut pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, pty_tx)?;
-        let (stdin_tx, mut stdin_rx) = mpsc::unbounded_channel::<StdinInput>();
+        let (pty_tx, pty_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+        let pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, pty_tx)?;
+        let (stdin_tx, stdin_rx) = mpsc::unbounded_channel::<StdinInput>();
 
-        let mut rx = self.tx.subscribe();
-        let tx = self.tx.clone();
-        let concepts = Arc::clone(&self.concepts);
-        let id = config.id;
-        let labels = config.labels;
+        let task_ctx = TaskContext {
+            id: config.id,
+            labels: config.labels,
+            concepts: Arc::clone(&self.concepts),
+            rx: self.tx.subscribe(),
+            tx: self.tx.clone(),
+        };
 
-        tokio::spawn(async move {
-            let mut line_parser = crate::parser::LineParser::new();
-            loop {
-                tokio::select! {
-                    Ok(event) = rx.recv() => {
-                        let commands =
-                            concept::matching_commands(id, &labels, &concepts, &event);
-                        for cmd in commands {
-                            let _ = pty_handle.write_line(&cmd);
-                        }
-                    }
-                    Some(bytes) = pty_rx.recv() => {
-                        let lines = line_parser.feed(&bytes);
-                        for line in lines {
-                            concept::match_and_broadcast(id, &concepts, &tx, &line);
-                        }
-                    }
-                    Some(input) = stdin_rx.recv() => {
-                        match input {
-                            StdinInput::Line(line) => {
-                                let _ = pty_handle.write_line(&line);
-                            }
-                            StdinInput::Raw(data) => {
-                                let _ = pty_handle.write_bytes(&data);
-                            }
-                            StdinInput::Resize { rows, cols } => {
-                                let _ = pty_handle.resize(rows, cols);
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        tokio::spawn(run_terminal_task(task_ctx, pty_handle, pty_rx, stdin_rx, None));
 
-        Ok(PtyTerminalHandle { id, stdin_tx })
+        Ok(PtyTerminalHandle { id: config.id, stdin_tx })
     }
 
     /// Spawn a terminal with both concept matching and a renderable grid.
@@ -174,67 +144,92 @@ impl WorkspaceEngine {
         rows: usize,
         cols: usize,
     ) -> Result<SpawnedTerminal, Box<dyn std::error::Error + Send + Sync>> {
-        let (pty_tx, mut pty_rx) = mpsc::unbounded_channel::<Vec<u8>>();
-        let mut pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, pty_tx)?;
-        let (stdin_tx, mut stdin_rx) = mpsc::unbounded_channel::<StdinInput>();
+        let (pty_tx, pty_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+        let pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, pty_tx)?;
+        let (stdin_tx, stdin_rx) = mpsc::unbounded_channel::<StdinInput>();
 
         let grid = Arc::new(Mutex::new(TermGrid::new(rows, cols)));
         let grid_clone = Arc::clone(&grid);
 
-        let mut rx = self.tx.subscribe();
-        let tx = self.tx.clone();
-        let concepts = Arc::clone(&self.concepts);
-        let id = config.id;
-        let labels = config.labels;
+        let task_ctx = TaskContext {
+            id: config.id,
+            labels: config.labels,
+            concepts: Arc::clone(&self.concepts),
+            rx: self.tx.subscribe(),
+            tx: self.tx.clone(),
+        };
 
-        let task = tokio::spawn(async move {
-            let mut line_parser = crate::parser::LineParser::new();
-            loop {
-                tokio::select! {
-                    // Concept-triggered actions from other terminals
-                    Ok(event) = rx.recv() => {
-                        let commands =
-                            concept::matching_commands(id, &labels, &concepts, &event);
-                        for cmd in commands {
-                            log::info!("[Pane {id}] Concept action: {cmd}");
-                            let _ = pty_handle.write_line(&cmd);
-                        }
+        let task = tokio::spawn(run_terminal_task(
+            task_ctx, pty_handle, pty_rx, stdin_rx, Some(grid_clone),
+        ));
+
+        Ok(SpawnedTerminal { handle: PtyTerminalHandle { id: config.id, stdin_tx }, grid, _task: task })
+    }
+}
+
+// ── Shared terminal task ──────────────────────────────────────────────
+
+/// Immutable context passed into every spawned terminal task.
+struct TaskContext {
+    id: u32,
+    labels: Vec<String>,
+    concepts: Arc<Vec<Concept>>,
+    rx: broadcast::Receiver<Event>,
+    tx: broadcast::Sender<Event>,
+}
+
+/// The shared async loop run by every terminal task.
+///
+/// Handles concept dispatch, PTY I/O, and optional grid updates.
+/// When `grid` is `Some`, PTY output is also fed into the [`TermGrid`]
+/// and resize commands update the grid dimensions.
+async fn run_terminal_task(
+    ctx: TaskContext,
+    mut pty_handle: crate::pty::PtyHandle,
+    mut pty_rx: mpsc::UnboundedReceiver<Vec<u8>>,
+    mut stdin_rx: mpsc::UnboundedReceiver<StdinInput>,
+    grid: Option<Arc<Mutex<TermGrid>>>,
+) {
+    let TaskContext { id, labels, concepts, mut rx, tx } = ctx;
+    let mut line_parser = crate::parser::LineParser::new();
+
+    loop {
+        tokio::select! {
+            Ok(event) = rx.recv() => {
+                let commands = concept::matching_commands(id, &labels, &concepts, &event);
+                for cmd in commands {
+                    let _ = pty_handle.write_line(&cmd);
+                }
+            }
+            Some(bytes) = pty_rx.recv() => {
+                let lines = line_parser.feed(&bytes);
+                for line in lines {
+                    concept::match_and_broadcast(id, &concepts, &tx, &line);
+                }
+                if let Some(ref g) = grid {
+                    if let Ok(mut locked) = g.lock() {
+                        locked.feed(&bytes);
                     }
-                    // PTY output → text parser + renderable grid
-                    Some(bytes) = pty_rx.recv() => {
-                        let lines = line_parser.feed(&bytes);
-                        for line in lines {
-                            concept::match_and_broadcast(id, &concepts, &tx, &line);
-                        }
-                        if let Ok(mut g) = grid_clone.lock() {
-                            g.feed(&bytes);
-                        }
+                }
+            }
+            Some(input) = stdin_rx.recv() => {
+                match input {
+                    StdinInput::Line(line) => {
+                        let _ = pty_handle.write_line(&line);
                     }
-                    // Keyboard/concept input from the caller
-                    Some(input) = stdin_rx.recv() => {
-                        match input {
-                            StdinInput::Line(line) => {
-                                let _ = pty_handle.write_line(&line);
-                            }
-                            StdinInput::Raw(data) => {
-                                let _ = pty_handle.write_bytes(&data);
-                            }
-                            StdinInput::Resize { rows, cols } => {
-                                let _ = pty_handle.resize(rows, cols);
-                                if let Ok(mut g) = grid_clone.lock() {
-                                    g.resize(rows as usize, cols as usize);
-                                }
+                    StdinInput::Raw(data) => {
+                        let _ = pty_handle.write_bytes(&data);
+                    }
+                    StdinInput::Resize { rows, cols } => {
+                        let _ = pty_handle.resize(rows, cols);
+                        if let Some(ref g) = grid {
+                            if let Ok(mut locked) = g.lock() {
+                                locked.resize(rows as usize, cols as usize);
                             }
                         }
                     }
                 }
             }
-        });
-
-        Ok(SpawnedTerminal {
-            handle: PtyTerminalHandle { id, stdin_tx },
-            grid,
-            _task: task,
-        })
+        }
     }
 }
