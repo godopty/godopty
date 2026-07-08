@@ -46,6 +46,7 @@ Key modules in `godopty-core`:
 - `engine.rs` — WorkspaceEngine with tokio broadcast pub-sub
 - `concept.rs` — regex-trigger → labelled-action routing
 - `types.rs` — Concept, Event, Action, TerminalConfig structs
+- `color.rs` — ANSI color mapping: named, indexed (256-color), true-color → RGB
 
 ### Godot scenes (`godot/scenes/`)
 
