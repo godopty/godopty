@@ -82,7 +82,7 @@ async fn run_mock_demo() {
         .await;
 
     log::info!("Engine running. Press Ctrl+C to stop.");
-    tokio::signal::ctrl_c().await.unwrap();
+    tokio::signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
     log::info!("Shutting down.");
 }
 
@@ -189,11 +189,13 @@ fn run_term_demo() {
 
 // ── Shared concept registry ────────────────────────────────────────────
 
+/// Build the concept registry used by all demo modes.
+/// Currently registers "crash_detected" and "port_conflict" triggers.
 fn build_concepts() -> Vec<Concept> {
     vec![
         Concept {
             name: "crash_detected".into(),
-            trigger_regex: Regex::new(r"(?i)crash|panic|segfault|SIGSEGV").unwrap(),
+            trigger_regex: Regex::new(r"(?i)crash|panic|segfault|SIGSEGV").expect("invalid crash_detected regex"),
             destinations: vec![Action {
                 command_template: "echo '[Auto] Restart attempt triggered by crash'".into(),
                 target_label: "backend".into(),
@@ -201,7 +203,7 @@ fn build_concepts() -> Vec<Concept> {
         },
         Concept {
             name: "port_conflict".into(),
-            trigger_regex: Regex::new(r"(?i)address.*already.*in\s*use").unwrap(),
+            trigger_regex: Regex::new(r"(?i)address.*already.*in\s*use").expect("invalid port_conflict regex"),
             destinations: vec![Action {
                 command_template: "echo '[Auto] Port conflict detected — consider lsof -i'".into(),
                 target_label: "observer".into(),

@@ -174,7 +174,7 @@ impl GodoptyTerminal {
     /// Cursor shape: 0 = Block, 1 = Underline, 2 = Beam.
     #[func]
     fn get_cursor_shape(&self) -> i64 {
-        self.with_grid(|g| g.cursor_shape() as i64, -1)
+        self.with_grid(|g| g.cursor_shape() as u8 as i64, -1)
     }
 
     /// Resize the terminal grid and PTY to `rows × cols`.

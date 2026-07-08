@@ -20,6 +20,15 @@ use alacritty_terminal::term::cell::Flags;
 use alacritty_terminal::term::Config;
 use alacritty_terminal::Term;
 
+/// Cursor shape returned by the terminal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CursorShape {
+    Block = 0,
+    Underline = 1,
+    Beam = 2,
+}
+
 use crate::color::color_to_rgb;
 
 /// A character cell ready for rendering.
@@ -186,12 +195,12 @@ impl TermGrid {
     }
 
     /// Cursor shape: 0 = Block, 1 = Underline, 2 = Beam.
-    pub fn cursor_shape(&self) -> u8 {
+    pub fn cursor_shape(&self) -> CursorShape {
         match self.term.renderable_content().cursor.shape {
-            alacritty_terminal::vte::ansi::CursorShape::Block => 0,
-            alacritty_terminal::vte::ansi::CursorShape::Underline => 1,
-            alacritty_terminal::vte::ansi::CursorShape::Beam => 2,
-            _ => 0,
+            alacritty_terminal::vte::ansi::CursorShape::Block => CursorShape::Block,
+            alacritty_terminal::vte::ansi::CursorShape::Underline => CursorShape::Underline,
+            alacritty_terminal::vte::ansi::CursorShape::Beam => CursorShape::Beam,
+            _ => CursorShape::Block,
         }
     }
 
@@ -230,8 +239,11 @@ impl CellInfo {
     pub const DEFAULT_FG: [u8; 3] = [204, 204, 204];
     /// Default terminal background color (dark gray).
     pub const DEFAULT_BG: [u8; 3] = [30, 30, 30];
+}
 
-    pub fn default() -> Self {
+impl Default for CellInfo {
+    /// Returns a default empty cell with terminal colors.
+    fn default() -> Self {
         Self {
             ch: ' ',
             fg: Self::DEFAULT_FG,
@@ -242,7 +254,9 @@ impl CellInfo {
             inverse: false,
         }
     }
+}
 
+impl CellInfo {
     /// Convert from alacritty's `Cell` type.
     ///
     /// Named colors (like "Background", "Foreground", "Red") are resolved

@@ -1,3 +1,9 @@
+//! Cross-platform PTY lifecycle via [`portable_pty`].
+//!
+//! Spawns a shell process connected to a pseudo-terminal, runs a
+//! dedicated I/O thread for reading, and exposes write/resize operations.
+//! Each PTY uses one OS thread.
+
 use std::io::{Read, Write};
 use std::thread;
 
@@ -7,6 +13,7 @@ use tokio::sync::mpsc::UnboundedSender;
 const DEFAULT_ROWS: u16 = 24;
 const DEFAULT_COLS: u16 = 80;
 const READ_BUF_SIZE: usize = 4096;
+/// A handle to a spawned PTY: shell process + I/O thread.
 
 pub struct PtyHandle {
     pub id: u32,
@@ -17,6 +24,8 @@ pub struct PtyHandle {
 }
 
 impl PtyHandle {
+    /// Spawn a shell process in a new PTY and start a reader thread.
+    /// Output bytes are sent to `tx` as `Vec<u8>` chunks.
     pub fn spawn(
         id: u32, command: &str, args: &[&str], tx: UnboundedSender<Vec<u8>>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -49,12 +58,14 @@ impl PtyHandle {
         Ok(Self { id, writer, master, _child: child, _read_thread: read_thread })
     }
 
+    /// Write a line to the PTY (appends `\n`).
     pub fn write_line(&mut self, line: &str) -> Result<(), std::io::Error> {
         self.writer.write_all(line.as_bytes())?;
         self.writer.write_all(b"\n")?;
         self.writer.flush()
     }
 
+    /// Write raw bytes to the PTY (no newline appended).
     pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), std::io::Error> {
         self.writer.write_all(data)?;
         self.writer.flush()
