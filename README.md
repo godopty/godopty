@@ -253,7 +253,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Search** — Ctrl+F regex search across scrollback using alacritty_terminal
 - [ ] **Damage tracking** — only redraw changed grid lines (optimization)
 - [ ] **Optimize grid data transfer** — avoid per-frame full-grid Dictionary allocation across the gdext bridge (1,920 allocs/frame at 80×24)
-- [ ] **Deduplicate engine spawn functions** — `spawn_pty_terminal` and `spawn_terminal_with_grid` share ~80% code; extract shared async loop
+- [ ] ~~**Deduplicate engine spawn functions**~~ — extracted shared `run_terminal_task()` helper; `spawn_pty_terminal` and `spawn_terminal_with_grid` are now thin wrappers
 - [ ] **PtyHandle.resize wired to SIGWINCH** — shell reflows on pane resize
 - [ ] **Configurable color palettes** — load xterm color schemes
 
