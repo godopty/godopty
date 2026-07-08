@@ -60,6 +60,8 @@
 godopty/
 ├── Cargo.toml                  # Workspace root
 ├── README.md
+├── AGENTS.md                   # AI agent onboarding guide
+├── LICENSE                     # Apache 2.0
 ├── .gitignore
 ├── crates/
 │   ├── godopty-core/           # Library crate
@@ -86,7 +88,10 @@ godopty/
     ├── godopty.gdextension
     └── scenes/
         ├── main.tscn
-        └── terminal.gd
+        ├── workspace.gd        # Root controller, layout, settings, sidebar
+        ├── terminal_pane.gd    # Primary terminal renderer (Control-based)
+        ├── terminal.gd         # Alternative terminal renderer (Node2D-based)
+        └── focus_manager.gd    # Autoload: Alt+Arrow pane navigation
 ```
 
 ---
@@ -261,6 +266,10 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Notification/warning system** — toast messages for errors and limits
 - [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
 
+### Repository
+- [ ] **CONTRIBUTING.md** — setup instructions, PR process, and code style guide for contributors
+- [ ] **`.github/` directory** — issue templates (bug report, feature request) and pull request template
+
 ---
 
 ## Technical Hurdles & Mitigations
@@ -287,12 +296,8 @@ Features planned for future phases, roughly prioritized:
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Ensure `cargo check` passes
-4. Run both demos to verify no regressions
-5. Submit a pull request
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and the pull request process.
 
 ## License
 
-TBD
+This project is licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE) for details.
