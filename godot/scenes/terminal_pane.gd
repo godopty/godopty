@@ -226,8 +226,6 @@ func _gui_input(event):
 		_sel_end = _mouse_to_cell(event.position); queue_redraw()
 
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_W and event.ctrl_pressed and not event.shift_pressed and not event.alt_pressed:
-			queue_free(); accept_event(); return
 		if event.keycode == KEY_C and event.ctrl_pressed and event.shift_pressed:
 			var st = _get_selected_text()
 			if st != "": DisplayServer.clipboard_set(st)
