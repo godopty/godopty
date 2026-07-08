@@ -248,10 +248,13 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Code viewer pane** — Godot `CodeEdit` node for read-only file display
 - [ ] **Task ledger** — persistent to-do list per workspace
 - [ ] **Pane type registry** — unified interface for adding custom pane types
+- [ ] **Consolidate terminal renderers** — `terminal.gd` (Node2D) and `terminal_pane.gd` (Control) are ~85% duplicated; merge into a shared base class or delete the unused variant
 
 ### Terminal Engine
 - [ ] **Search** — Ctrl+F regex search across scrollback using alacritty_terminal
 - [ ] **Damage tracking** — only redraw changed grid lines (optimization)
+- [ ] **Optimize grid data transfer** — avoid per-frame full-grid Dictionary allocation across the gdext bridge (1,920 allocs/frame at 80×24)
+- [ ] **Deduplicate engine spawn functions** — `spawn_pty_terminal` and `spawn_terminal_with_grid` share ~80% code; extract shared async loop
 - [ ] **PtyHandle.resize wired to SIGWINCH** — shell reflows on pane resize
 - [ ] **Configurable color palettes** — load xterm color schemes
 
