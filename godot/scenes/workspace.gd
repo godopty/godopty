@@ -543,7 +543,7 @@ func _run(c: String):
 	match c:
 		"new terminal": var p = _spawn(); if p: p.grab_focus()
 		"close active": _kill_last()
-		"settings": _open_settings
+		"settings": _open_settings()
 		"reset layout": _reset()
 		"save": _save();
 		"load": _restore()
