@@ -49,6 +49,7 @@ const TerminalPaneScript = preload("res://scenes/terminal_pane.gd")
 var _cfg_cursor_shape := 0
 var _cfg_cursor_blink := true
 var _cfg_cursor_blink_speed := 0.5
+var _cfg_scroll_lines := 3
 var _cfg_font_size := 14
 
 var _sidebar: Control
@@ -448,10 +449,11 @@ func _load_settings():
 		_cfg_cursor_shape = d.get("cursor_shape", 0)
 		_cfg_cursor_blink = d.get("cursor_blink", true)
 		_cfg_cursor_blink_speed = d.get("cursor_blink_speed", 0.5)
+		_cfg_scroll_lines = d.get("scroll_lines", 3)
 		_cfg_font_size = d.get("font_size", 14)
 
 func _save_settings():
-	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "font_size": _cfg_font_size}
+	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "font_size": _cfg_font_size}
 	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d))
 
@@ -459,6 +461,7 @@ func _apply_settings_to(body: Control):
 	body.cursor_shape = _cfg_cursor_shape
 	body.cursor_blink = _cfg_cursor_blink
 	body.cursor_blink_speed = _cfg_cursor_blink_speed
+	body.scroll_lines = _cfg_scroll_lines
 	body.font_size = _cfg_font_size
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -489,6 +492,7 @@ func _build_settings() -> Control:
 	var blink_cb = _add_blink_control(v)
 	var blink_spin = _add_blink_speed_control(v)
 	var fs_spin = _add_font_control(v)
+	var scroll_spin = _add_scroll_control(v)
 
 	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
 	# only trigger one save + propagate cycle.
@@ -497,7 +501,7 @@ func _build_settings() -> Control:
 	_settings_debounce_timer.one_shot = true
 	_settings_debounce_timer.wait_time = SETTINGS_DEBOUNCE
 	_settings_debounce_timer.timeout.connect(func():
-		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value), blink_spin.value))
+		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value), blink_spin.value, int(scroll_spin.value)))
 	bg.add_child(_settings_debounce_timer)
 
 	# Wire controls to debounced apply
@@ -505,9 +509,10 @@ func _build_settings() -> Control:
 	blink_cb.toggled.connect(func(_pressed): _settings_debounce_timer.start())
 	blink_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
 	fs_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
+	scroll_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
 
 	# Reset
-	_add_reset_button(v, shape_opt, blink_cb, blink_spin, fs_spin)
+	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, fs_spin)
 
 	bg.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
@@ -558,26 +563,39 @@ func _add_font_control(v: VBoxContainer) -> SpinBox:
 	v.add_child(hf)
 	return spin
 
-func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, fs_spin: SpinBox):
+func _add_scroll_control(v: VBoxContainer) -> SpinBox:
+	var hs = HBoxContainer.new()
+	hs.add_child(_lbl("Scroll lines:", 13))
+	var spin = SpinBox.new(); spin.name = "ScrollSpin"
+	spin.min_value = 1; spin.max_value = 10; spin.step = 1
+	spin.value = _cfg_scroll_lines
+	hs.add_child(spin)
+	v.add_child(hs)
+	return spin
+
+func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, fs_spin: SpinBox):
 	var btn = Button.new(); btn.text = "Reset to defaults"
 	btn.pressed.connect(func():
 		_cfg_cursor_shape = 0
 		_cfg_cursor_blink = true
 		_cfg_cursor_blink_speed = 0.5
+		_cfg_scroll_lines = 3
 		_cfg_font_size = 14
 		_save_settings()
 		shape_opt.selected = 0
 		blink_cb.button_pressed = true
 		blink_spin.value = 0.5
+		scroll_spin.value = 3
 		fs_spin.value = 14
 		var all2: Array[Control] = []; _collect_bodies(all2)
 		for body in all2: _apply_settings_to(body))
 	v.add_child(btn)
 
-func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int, blink_speed: float):
+func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int, blink_speed: float, scroll_lines: int):
 	_cfg_cursor_shape = cursor_shape
 	_cfg_cursor_blink = cursor_blink
 	_cfg_cursor_blink_speed = blink_speed
+	_cfg_scroll_lines = scroll_lines
 	_cfg_font_size = font_size
 	_save_settings()
 	var all2: Array[Control] = []; _collect_bodies(all2)

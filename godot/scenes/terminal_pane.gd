@@ -6,6 +6,7 @@ signal title_changed(new_title: String)
 
 const CURSOR_BLINK_INTERVAL = 0.5
 const SCROLL_LINES = 3
+@export var scroll_lines: int = SCROLL_LINES
 const PADDING = 4
 const FOCUS_BORDER_COLOR = Color(0.4, 0.7, 1.0, 0.3)
 const FOCUS_BORDER_WIDTH = 2.0
@@ -247,8 +248,8 @@ func _handle_mouse(event: InputEvent):
 				grab_focus(); _selecting = true
 				_sel_start = _mouse_to_cell(event.position); _sel_end = _sel_start; queue_redraw()
 			else: _selecting = false; queue_redraw()
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed: _terminal.scroll_up(SCROLL_LINES)
-		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed: _terminal.scroll_down(SCROLL_LINES)
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed: _terminal.scroll_up(scroll_lines)
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed: _terminal.scroll_down(scroll_lines)
 	if event is InputEventMouseMotion and _selecting:
 		_sel_end = _mouse_to_cell(event.position); queue_redraw()
 
