@@ -239,6 +239,14 @@ impl GodoptyTerminal {
         self.with_grid(|g| g.num_cols() as i64, 0)
     }
 
+    /// Monotonically increasing counter; changes every time the grid is
+    /// updated. GDScript can compare to a cached value to skip redundant
+    /// `get_grid_rows()` calls when nothing changed.
+    #[func]
+    fn get_grid_generation(&self) -> i64 {
+        self.with_grid(|g| g.generation as i64, -1)
+    }
+
     /// Return all rows as `Array[Array[Dictionary]]`.
     ///
     /// Each dictionary has keys: `"ch"` (String), `"fg"` (Color), `"bg"` (Color).

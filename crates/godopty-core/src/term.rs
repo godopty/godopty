@@ -95,6 +95,9 @@ pub struct TermGrid {
     title: Arc<Mutex<String>>,
     rows: usize,
     cols: usize,
+    /// Incremented on every feed() and resize(); used by Godot to
+    /// skip redundant grid fetches when nothing changed.
+    pub generation: u64,
 }
 
 impl TermGrid {
@@ -110,7 +113,7 @@ impl TermGrid {
         let term = Term::new(config, &size, listener);
         let processor = vte::ansi::Processor::new();
 
-        Self { term, processor, title, rows, cols }
+        Self { term, processor, title, rows, cols, generation: 0 }
     }
 
     /// Feed raw PTY output bytes into the terminal state machine.
@@ -163,6 +166,7 @@ impl TermGrid {
         self.rows = rows;
         self.cols = cols;
         self.term.resize(GridSize { rows, cols });
+        self.generation += 1;
     }
 
     /// Current terminal title (set via OSC escape sequences, e.g. bash prompt).

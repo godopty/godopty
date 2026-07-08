@@ -49,6 +49,7 @@ var _last_title: String = ""
 var _selecting: bool = false
 var _sel_start: Vector2i = Vector2i(-1, -1)
 var _sel_end: Vector2i = Vector2i(-1, -1)
+var _last_grid_gen: int = -1
 
 func _ready():
 	_terminal = GodoptyTerminal.new()
@@ -102,14 +103,15 @@ func _process(delta):
 	else:
 		_cursor_visible = true
 
-	var new_grid = _terminal.get_grid_rows()
-	if _cell_changed(new_grid):
-		_cell_cache = new_grid
-		_cursor_visible = true
-		_cursor_blink_timer = 0.0
-		queue_redraw()
-	else:
-		queue_redraw()
+	var gen = _terminal.get_grid_generation()
+	if gen != _last_grid_gen:
+		_last_grid_gen = gen
+		var new_grid = _terminal.get_grid_rows()
+		if _cell_changed(new_grid):
+			_cell_cache = new_grid
+			_cursor_visible = true
+			_cursor_blink_timer = 0.0
+	queue_redraw()
 
 	var t = _terminal.get_title()
 	if t != _last_title and t != "":
