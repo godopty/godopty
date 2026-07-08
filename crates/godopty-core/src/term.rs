@@ -139,8 +139,13 @@ impl TermGrid {
             vec![vec![CellInfo::default(); self.cols]; self.rows];
 
         for indexed in content.display_iter {
-            // alacritty uses i32-based indexing; convert to usize for vec access
-            let line = indexed.point.line.0 as usize;
+            // display_iter reports negative line numbers for history rows;
+            // detect them first to avoid wrapping on usize cast
+            let raw_line = indexed.point.line.0;
+            if raw_line < 0 {
+                continue;
+            }
+            let line = raw_line as usize;
             let col = indexed.point.column.0 as usize;
 
             if line < self.rows && col < self.cols {
