@@ -19,6 +19,9 @@ const PRINTABLE_ASCII_MAX = 126
 
 @export var beam_cursor_width: int = BEAM_CURSOR_WIDTH
 @export var underline_cursor_height: int = UNDERLINE_CURSOR_HEIGHT
+@export var focus_border_color: Color = FOCUS_BORDER_COLOR
+@export var selection_color: Color = SELECTION_COLOR
+@export var scrollback_indicator_color: Color = SCROLLBACK_INDICATOR_COLOR
 
 @export var shell_command: String = "/bin/bash"
 @export var rows: int = 24
@@ -137,7 +140,7 @@ func _draw():
 
 	# Focus border
 	if has_focus():
-		draw_rect(Rect2(0, 0, size.x, size.y), FOCUS_BORDER_COLOR, false, FOCUS_BORDER_WIDTH)
+		draw_rect(Rect2(0, 0, size.x, size.y), focus_border_color, false, FOCUS_BORDER_WIDTH)
 
 	# Cursor
 	if _cursor_visible:
@@ -148,7 +151,7 @@ func _draw():
 	if so > 0:
 		draw_string(_font, Vector2(off.x + _cell_w * 0.5, off.y + _cell_h * 0.5),
 			"[Scroll: %d/%d lines]" % [so, _terminal.get_history_size()],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, SCROLLBACK_INDICATOR_COLOR)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, scrollback_indicator_color)
 
 	# Selection
 	if _sel_start.x >= 0 and _sel_end.x >= 0:
@@ -206,7 +209,7 @@ func _draw_selection(off: Vector2):
 		var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1) + 1
 		for c in range(cb, ce):
 			if c >= 0 and c < cols:
-				draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), SELECTION_COLOR)
+				draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), selection_color)
 
 
 func _get_selected_text() -> String:

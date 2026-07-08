@@ -27,7 +27,7 @@ const SIDEBAR_BG_COLOR = Color(0.12, 0.12, 0.15, 1.0)
 
 # UI sizes
 const SETTINGS_PANEL_W = 320
-const SETTINGS_PANEL_H = 260
+const SETTINGS_PANEL_H = 520
 const PALETTE_PANEL_W = 350
 const PALETTE_PANEL_H = 240
 const MIN_FONT_SIZE = 8
@@ -54,6 +54,13 @@ var _cfg_default_rows := 24
 var _cfg_default_cols := 80
 var _cfg_beam_width := 2
 var _cfg_underline_height := 3
+var _cfg_wrapper_bg := WRAPPER_BG_COLOR
+var _cfg_title_bar_bg := TITLE_BAR_BG_COLOR
+var _cfg_wrapper_border := WRAPPER_BORDER_COLOR
+var _cfg_sidebar_bg := SIDEBAR_BG_COLOR
+var _cfg_focus_border := FOCUS_BORDER_COLOR
+var _cfg_selection := SELECTION_COLOR
+var _cfg_scrollback_indicator := SCROLLBACK_INDICATOR_COLOR
 var _cfg_font_size := 14
 
 var _sidebar: Control
@@ -460,12 +467,23 @@ func _load_settings():
 		_cfg_default_cols = d.get("default_cols", 80)
 		_cfg_beam_width = d.get("beam_width", 2)
 		_cfg_underline_height = d.get("underline_height", 3)
+		_cfg_wrapper_bg = _color_from_hex(d.get("wrapper_bg", ""), WRAPPER_BG_COLOR)
+		_cfg_title_bar_bg = _color_from_hex(d.get("title_bar_bg", ""), TITLE_BAR_BG_COLOR)
+		_cfg_wrapper_border = _color_from_hex(d.get("wrapper_border", ""), WRAPPER_BORDER_COLOR)
+		_cfg_sidebar_bg = _color_from_hex(d.get("sidebar_bg", ""), SIDEBAR_BG_COLOR)
+		_cfg_focus_border = _color_from_hex(d.get("focus_border", ""), FOCUS_BORDER_COLOR)
+		_cfg_selection = _color_from_hex(d.get("selection", ""), SELECTION_COLOR)
+		_cfg_scrollback_indicator = _color_from_hex(d.get("scrollback_indicator", ""), SCROLLBACK_INDICATOR_COLOR)
 		_cfg_font_size = d.get("font_size", 14)
 
 func _save_settings():
-	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "beam_width": _cfg_beam_width, "underline_height": _cfg_underline_height, "font_size": _cfg_font_size}
+	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "beam_width": _cfg_beam_width, "underline_height": _cfg_underline_height, "wrapper_bg": _cfg_wrapper_bg.to_html(), "title_bar_bg": _cfg_title_bar_bg.to_html(), "wrapper_border": _cfg_wrapper_border.to_html(), "sidebar_bg": _cfg_sidebar_bg.to_html(), "focus_border": _cfg_focus_border.to_html(), "selection": _cfg_selection.to_html(), "scrollback_indicator": _cfg_scrollback_indicator.to_html(), "font_size": _cfg_font_size}
 	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d))
+
+func _color_from_hex(hex: String, fallback: Color) -> Color:
+	if hex == "": return fallback
+	return Color.from_string(hex, fallback)
 
 func _apply_settings_to(body: Control):
 	body.cursor_shape = _cfg_cursor_shape
@@ -476,6 +494,9 @@ func _apply_settings_to(body: Control):
 	body.cols = _cfg_default_cols
 	body.beam_cursor_width = _cfg_beam_width
 	body.underline_cursor_height = _cfg_underline_height
+	body.focus_border_color = _cfg_focus_border
+	body.selection_color = _cfg_selection
+	body.scrollback_indicator_color = _cfg_scrollback_indicator
 	body.font_size = _cfg_font_size
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -509,6 +530,7 @@ func _build_settings() -> Control:
 	var scroll_spin = _add_scroll_control(v)
 	var dims = _add_dims_control(v)
 	var cursor_px = _add_cursor_thickness_control(v)
+	var color_btns = _add_color_section(v)
 
 	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
 	# only trigger one save + propagate cycle.
@@ -528,7 +550,7 @@ func _build_settings() -> Control:
 	scroll_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
 
 	# Reset
-	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, dims, cursor_px, fs_spin)
+	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, dims, cursor_px, color_btns, fs_spin)
 
 	bg.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
@@ -604,6 +626,32 @@ func _add_dims_control(v: VBoxContainer) -> Array:
 	v.add_child(hr)
 	return [rspin, cspin]
 
+func _add_color_control(v: VBoxContainer, label: String, value: Color, setter: Callable) -> void:
+	var h = HBoxContainer.new()
+	h.add_child(_lbl(label, 12))
+	var btn = ColorPickerButton.new()
+	btn.color = value
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.color_changed.connect(setter)
+	h.add_child(btn)
+	v.add_child(h)
+
+func _add_color_section(v: VBoxContainer) -> Array:
+	v.add_child(_lbl("UI Colors:", 13))
+	var btns = []
+	for item in [
+		["Wrapper bg", _cfg_wrapper_bg, func(c: Color): _cfg_wrapper_bg = c; _settings_debounce_timer.start()],
+		["Title bar", _cfg_title_bar_bg, func(c: Color): _cfg_title_bar_bg = c; _settings_debounce_timer.start()],
+		["Border", _cfg_wrapper_border, func(c: Color): _cfg_wrapper_border = c; _settings_debounce_timer.start()],
+		["Sidebar", _cfg_sidebar_bg, func(c: Color): _cfg_sidebar_bg = c; _settings_debounce_timer.start()],
+		["Focus", _cfg_focus_border, func(c: Color): _cfg_focus_border = c; _settings_debounce_timer.start()],
+		["Selection", _cfg_selection, func(c: Color): _cfg_selection = c; _settings_debounce_timer.start()],
+		["Scroll", _cfg_scrollback_indicator, func(c: Color): _cfg_scrollback_indicator = c; _settings_debounce_timer.start()],
+	]:
+		var b = _add_color_control(v, item[0], item[1], item[2])
+		btns.append([item[0], b])
+	return btns
+
 func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
 	var hc = HBoxContainer.new()
 	hc.add_child(_lbl("Cursor px:", 13))
@@ -620,7 +668,15 @@ func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
 	v.add_child(hc)
 	return [bspin, uspin]
 
-func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, cursor_px: Array, fs_spin: SpinBox):
+func _reset_colors(btns: Array):
+	var defaults = [WRAPPER_BG_COLOR, TITLE_BAR_BG_COLOR, WRAPPER_BORDER_COLOR, SIDEBAR_BG_COLOR, FOCUS_BORDER_COLOR, SELECTION_COLOR, SCROLLBACK_INDICATOR_COLOR]
+	for i in btns.size():
+		var picker = btns[i][1].get_child(0) if btns[i][1] is HBoxContainer else btns[i][1]
+		# btns[i] is [label, ColorPickerButton]
+		var ctrl = (btns[i][1] as ColorPickerButton)
+		ctrl.color = defaults[i]
+
+func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, cursor_px: Array, color_btns: Array, fs_spin: SpinBox):
 	var btn = Button.new(); btn.text = "Reset to defaults"
 	btn.pressed.connect(func():
 		_cfg_cursor_shape = 0
@@ -631,6 +687,13 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		_cfg_default_cols = 80
 		_cfg_beam_width = 2
 		_cfg_underline_height = 3
+		_cfg_wrapper_bg = WRAPPER_BG_COLOR
+		_cfg_title_bar_bg = TITLE_BAR_BG_COLOR
+		_cfg_wrapper_border = WRAPPER_BORDER_COLOR
+		_cfg_sidebar_bg = SIDEBAR_BG_COLOR
+		_cfg_focus_border = FOCUS_BORDER_COLOR
+		_cfg_selection = SELECTION_COLOR
+		_cfg_scrollback_indicator = SCROLLBACK_INDICATOR_COLOR
 		_cfg_font_size = 14
 		_save_settings()
 		shape_opt.selected = 0
@@ -641,6 +704,7 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		dims[1].value = 80
 		cursor_px[0].value = 2
 		cursor_px[1].value = 3
+		_reset_colors(color_btns)
 		fs_spin.value = 14
 		var all2: Array[Control] = []; _collect_bodies(all2)
 		for body in all2: _apply_settings_to(body))
