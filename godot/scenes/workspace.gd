@@ -570,7 +570,7 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		blink_cb.button_pressed = true
 		blink_spin.value = 0.5
 		fs_spin.value = 14
-		var all2 = []; _collect_bodies(all2)
+		var all2: Array[Control] = []; _collect_bodies(all2)
 		for body in all2: _apply_settings_to(body))
 	v.add_child(btn)
 
@@ -580,7 +580,7 @@ func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: i
 	_cfg_cursor_blink_speed = blink_speed
 	_cfg_font_size = font_size
 	_save_settings()
-	var all2 = []; _collect_bodies(all2)
+	var all2: Array[Control] = []; _collect_bodies(all2)
 	for body in all2: _apply_settings_to(body)
 
 # ═══════════════════════════════════════════════════════════════════════
