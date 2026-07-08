@@ -319,11 +319,11 @@ func _list():
 		var row = HBoxContainer.new()
 		var btn = Button.new(); btn.text = "T%d" % (i + 1)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.pressed.connect(func(): body.grab_focus())
+		btn.pressed.connect(func(b = body): b.grab_focus())
 		row.add_child(btn)
 		var x = Button.new(); x.text = "✕"; x.flat = true
 		x.custom_minimum_size = Vector2(22, 0)
-		x.pressed.connect(func(): _kill(body))
+		x.pressed.connect(func(b = body): _kill(b))
 		row.add_child(x)
 		pl.add_child(row)
 
@@ -381,7 +381,7 @@ func _restore():
 		var w = _build_wrapper(sh, td.get("rows", 24), td.get("cols", 80))
 		_grid.add_child(w)
 		var body = _find_body(w)
-		body.focus_entered.connect(func(): _last_body = body)
+		body.focus_entered.connect(func(b = body): _last_body = b)
 		_tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),
 			cspan = td.get("cspan", GRID), rspan = td.get("rspan", GRID)})
 	_apply_layout(); _list()
