@@ -39,15 +39,16 @@ godot/
 | Ctrl+P | Command palette |
 | Ctrl+Shift+R | Emergency reset |
 | Ctrl+Shift+C | Copy selection |
+| Ctrl+Shift+V | Paste from clipboard |
 | Alt+←↑↓→ | Jump to adjacent pane |
 
 ## Sidebar
 
 - [+ Terminal] — spawn a new terminal
-- [✕ Close Active] — close last-focused terminal
-- [↺ Reset] — clear all terminals (blank canvas)
-- [Save Layout] / [Load Layout] — persist/restore grid layout
+- [⚙ Settings] — open global settings panel
+- [↺ Reset] — clear all terminals and layout
+- [Save] / [Load] — persist/restore grid layout
 
 ## Command Palette (Ctrl+P)
 
-Type partial commands to fuzzy-match: `new`, `close`, `reset`, `save`, `load`.
+Type partial commands: `new`, `close`, `settings`, `reset`, `save`, `load`.

@@ -25,10 +25,22 @@ target/debug/libgodopty_gdext.so
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `start_shell(cmd: String, rows: int, cols: int)` | void | Start a PTY session |
-| `send_input(text: String)` | void | Send text to the PTY (appends `\n`) |
-| `get_grid_rows()` | `Array[Array[Dictionary]]` | Get the full renderable grid |
-| `get_rows()` | `int` | Grid row count (0 if no shell) |
+| `send_text(text: String)` | void | Send raw text to PTY (no newline) |
+| `send_line(text: String)` | void | Send a line to PTY (appends `\n`) |
+| `resize_grid(rows: int, cols: int)` | void | Resize grid + send SIGWINCH |
+| `get_grid_rows()` | `Array[Array[Dictionary]]` | Full renderable grid |
+| `get_grid_generation()` | `int` | Monotonic counter, changes on grid update |
+| `get_cursor_row()` | `int` | Cursor row (0-based, -1 if none) |
+| `get_cursor_col()` | `int` | Cursor column (0-based) |
+| `get_cursor_shape()` | `int` | 0=Block, 1=Underline, 2=Beam |
+| `get_title()` | `String` | Terminal window title (OSC) |
+| `get_rows()` | `int` | Grid row count |
 | `get_cols()` | `int` | Grid column count |
+| `scroll_up(lines: int)` | void | Scroll back in history |
+| `scroll_down(lines: int)` | void | Scroll forward in history |
+| `scroll_reset()` | void | Reset scroll to follow output |
+| `get_scroll_offset()` | `int` | Lines above visible viewport |
+| `get_history_size()` | `int` | Total scrollback lines available |
 
 ### Grid Cell Dictionary
 
@@ -40,10 +52,8 @@ target/debug/libgodopty_gdext.so
 }
 ```
 
-### Edge Cases
+### Tips
 
-- **No shell started**: `get_grid_rows()` returns `[]`, `get_rows()` returns `0`
-- **Double start**: Calling `start_shell()` twice replaces the old PTY (child process terminates)
-- **Spawn failure**: Grid stays empty, error logged to Godot console
-- **Large grids**: `get_grid_rows()` copies the entire grid — poll at ~10-30 FPS
-- **Concurrent access**: The grid is behind a `Mutex`; if locked by the background task, `get_grid_rows()` returns `[]`
+- Use `get_grid_generation()` to skip redundant `get_grid_rows()` calls when the grid is idle
+- Poll at ~10–30 FPS; `get_grid_rows()` copies the entire grid
+- If the grid mutex is held by the background task, `get_grid_rows()` returns `[]`

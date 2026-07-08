@@ -11,7 +11,8 @@ Library crate for the godopty multi-PTY emulator. This is the engine — all ter
 | [`engine`](src/engine.rs) | Runtime orchestrator; spawns terminal tasks on tokio | `WorkspaceEngine`, `PtyTerminalHandle` |
 | [`pty`](src/pty.rs) | Cross-platform PTY lifecycle via `portable-pty` | `PtyHandle` |
 | [`parser`](src/parser.rs) | Strips ANSI escape sequences; extracts plain-text lines | `LineParser` |
-| [`term`](src/term.rs) | Full terminal grid via `alacritty_terminal` (Phase 2a+) | `TermGrid`, `CellInfo` |
+| [`term`](src/term.rs) | Full terminal grid via `alacritty_terminal` | `TermGrid`, `CellInfo` |
+| [`color`](src/color.rs) | ANSI color mapping — named, indexed, true-color → RGB | `color_to_rgb()` |
 
 ## Why Flat?
 
@@ -26,4 +27,3 @@ All modules are single files in `src/`. When a module grows beyond ~200 lines or
 | `alacritty_terminal` | 0.26 | Full terminal grid emulator (Phase 2a+) |
 | `tokio` | 1.52 | Async runtime + broadcast channel |
 | `regex` | 1.12 | Concept trigger patterns |
-| `thiserror` | 2 | Error type derivation (reserved for future use) |
