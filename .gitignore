@@ -38,3 +38,6 @@ godot/mono_crash.*.json
 # AI
 reasonix.toml
 .reasonix/
+
+# Local audit (delete when resolved)
+TODO-AUDIT.md
