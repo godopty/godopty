@@ -270,7 +270,7 @@ Features planned for future phases, roughly prioritized:
 
 ### User Settings
 - [ ] ~~**Cursor blink speed**~~ — added `cursor_blink_speed` setting (0.1–2.0 s, persisted to settings.json)
-- [ ] **Scroll wheel sensitivity** — make scroll lines-per-tick configurable (currently 3)
+- [ ] ~~**Scroll wheel sensitivity**~~ — added `scroll_lines` setting (1–10, persisted to settings.json)
 - [ ] **Default terminal dimensions** — make new-pane rows×cols configurable (currently 24×80)
 - [ ] **Cursor thickness** — configurable beam cursor width (2 px) and underline height (3 px)
 - [ ] **UI theme colors** — expose wrapper, title-bar, sidebar, focus-border, selection, and scrollback-indicator colors
