@@ -224,16 +224,19 @@ impl TermGrid {
     /// Scroll up (back in history) by `lines`.
     pub fn scroll_up(&mut self, lines: usize) {
         self.term.grid_mut().scroll_display(Scroll::Delta(lines as i32));
+        self.generation += 1;
     }
 
     /// Scroll down (forward in history) by `lines`.
     pub fn scroll_down(&mut self, lines: usize) {
         self.term.grid_mut().scroll_display(Scroll::Delta(-(lines as i32)));
+        self.generation += 1;
     }
 
     /// Reset scroll to follow live output (bottom).
     pub fn scroll_reset(&mut self) {
         self.term.grid_mut().scroll_display(Scroll::Bottom);
+        self.generation += 1;
     }
 }
 
@@ -360,14 +363,16 @@ mod tests {
     }
 
     #[test]
-    fn generation_unchanged_on_scroll() {
+    fn generation_increments_on_scroll() {
         let mut g = TermGrid::new(5, 20);
         g.feed(b"line1\r\nline2\r\nline3\r\n");
-        let gen_after_feed = g.generation;
+        let gen_before = g.generation;
         g.scroll_up(1);
+		assert_eq!(g.generation, gen_before + 1);
         g.scroll_down(1);
+		assert_eq!(g.generation, gen_before + 2);
         g.scroll_reset();
-        assert_eq!(g.generation, gen_after_feed, "scroll operations should not change generation");
+        assert_eq!(g.generation, gen_before + 3, "scroll operations should increment generation");
     }
 
     #[test]
