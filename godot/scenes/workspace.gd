@@ -305,7 +305,6 @@ func _build_sidebar():
 	_add_sidebar_header(v)
 	_add_sidebar_buttons(v)
 	_add_pane_list(v)
-	_add_sidebar_action_buttons(v)
 	_add_collapsed_button()
 
 func _make_sidebar_bg() -> ColorRect:
@@ -344,10 +343,6 @@ func _add_pane_list(v: VBoxContainer):
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(sc)
 	var pl = VBoxContainer.new(); pl.name = "PaneList"
 	pl.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sc.add_child(pl)
-
-func _add_sidebar_action_buttons(v: VBoxContainer):
-	for b in [["Save", _save], ["Load", _restore]]:
-		var btn = Button.new(); btn.text = b[0]; btn.pressed.connect(b[1]); v.add_child(btn)
 
 func _add_collapsed_button():
 	var btn = Button.new()

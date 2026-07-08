@@ -47,7 +47,8 @@ godot/
 - [+ Terminal] — spawn a new terminal
 - [⚙ Settings] — open global settings panel
 - [↺ Reset] — clear all terminals and layout
-- [Save] / [Load] — persist/restore grid layout
+
+Layout is auto-saved on close and auto-restored on startup via `user://layout.json`.
 
 ## Command Palette (Ctrl+P)
 
