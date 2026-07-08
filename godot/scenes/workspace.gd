@@ -42,6 +42,8 @@ const TOAST_DELAY = 1.5
 # Content
 const PALETTE_COMMANDS = ["new terminal", "close active", "settings", "reset layout", "save", "load"]
 
+const TerminalPaneScript = preload("res://scenes/terminal_pane.gd")
+
 # Default settings (overridden by settings.json)
 var _cfg_cursor_shape := 0
 var _cfg_cursor_blink := true
@@ -243,7 +245,7 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 		btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 		btn.pressed.connect(item[1]); hbox.add_child(btn)
 
-	var term = load("res://scenes/terminal_pane.gd").new()
+	var term = TerminalPaneScript.new()
 	term.name = "Body"
 	term.shell_command = shell if shell != "" else DEFAULT_SHELL
 	term.rows = rows; term.cols = cols
@@ -256,10 +258,7 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	return root
 
 func _find_body(w: Control) -> Control:
-	for ch in w.get_children():
-		if ch.name == "Body": return ch
-		var f = _find_body(ch); if f: return f
-	return null
+	return w.get_node_or_null("VBoxContainer/Body")
 
 func _show_message(msg: String):
 	var lbl = Label.new()
@@ -346,8 +345,7 @@ func _collect_bodies(out: Array):
 
 func _list():
 	var pl = _sidebar.get_node_or_null("SidebarContent/PaneScroll/PaneList")
-	if pl == null: print("[sidebar] PaneList not found!"); return
-	print("[sidebar] listing ", _tiles.size(), " panes")
+	if pl == null: return
 	for c in pl.get_children(): c.queue_free()
 	for i in _tiles.size():
 		var body = _find_body(_tiles[i].wrapper)
