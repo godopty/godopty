@@ -221,6 +221,9 @@ impl WorkspaceEngine {
                             }
                             StdinInput::Resize { rows, cols } => {
                                 let _ = pty_handle.resize(rows, cols);
+                                if let Ok(mut g) = grid_clone.lock() {
+                                    g.resize(rows as usize, cols as usize);
+                                }
                             }
                         }
                     }
