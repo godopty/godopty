@@ -252,7 +252,7 @@ Features planned for future phases, roughly prioritized:
 ### Terminal Engine
 - [ ] **Search** — Ctrl+F regex search across scrollback using alacritty_terminal
 - [ ] **Damage tracking** — only redraw changed grid lines (optimization)
-- [ ] **Optimize grid data transfer** — avoid per-frame full-grid Dictionary allocation across the gdext bridge (1,920 allocs/frame at 80×24)
+- [ ] ~~**Optimize grid data transfer**~~ — added `generation` counter to TermGrid; GDScript skips `get_grid_rows()` when unchanged, avoiding per-frame Dictionary allocations
 - [ ] ~~**Deduplicate engine spawn functions**~~ — extracted shared `run_terminal_task()` helper; `spawn_pty_terminal` and `spawn_terminal_with_grid` are now thin wrappers
 - [ ] **PtyHandle.resize wired to SIGWINCH** — shell reflows on pane resize
 - [ ] **Configurable color palettes** — load xterm color schemes
