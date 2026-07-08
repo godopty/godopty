@@ -85,6 +85,11 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 - **Format**: [Conventional Commits](https://www.conventionalcommits.org/) — `feat(scope):`, `fix(scope):`, `chore(scope):`
 - Scopes: `settings`, `terminal`, `layout`, `sidebar`, `gdext`, `core`, `cli`
 
+### Pitfalls
+- **`alacritty_terminal` display_iter**: returns **negative** line numbers for scrollback history rows. Never cast directly to `usize` — it wraps to a huge value. Always add the grid's `display_offset()` to normalize: `let line = (indexed.point.line.0 + offset) as usize`.
+- **Godot typed Arrays**: `Array[T]` won't accept plain `Array`. If you type a parameter, check all call sites use matching types (`var x: Array[Control] = []`).
+- **GDExtension rebuilds**: After changing `#[func]` signatures or adding methods, rebuild with `cargo build -p godopty-gdext` and restart Godot.
+
 ## Notes
 
 - The ESC key handler on the settings panel exists but `gui_input` never receives the event (see README roadmap).
