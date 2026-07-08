@@ -12,7 +12,6 @@
 godot/.import/
 godot/.godot/
 godot/*.import
-godot/.godot/imported/
 godot/export/
 godot/export_presets.cfg
 
@@ -31,6 +30,8 @@ godot/mono_crash.*.json
 
 # ── Misc ──────────────────────────────────────────────────────────────────
 *.log
+*.orig
+*.patch
 .env
 .env.local
 
