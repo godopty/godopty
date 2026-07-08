@@ -1,4 +1,5 @@
 extends Control
+class_name TerminalPane
 # godopty Terminal Pane — Control-based node for focus + rendering.
 
 signal title_changed(new_title: String)

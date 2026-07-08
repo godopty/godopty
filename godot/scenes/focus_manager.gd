@@ -1,4 +1,5 @@
 extends Node
+class_name FocusManager
 # Focus Manager — autoload singleton for geographic pane navigation.
 # Listens for Alt+Arrow to jump to the nearest pane in that direction.
 
@@ -63,8 +64,8 @@ func _input(event):
 func _collect_panes(node: Node) -> Array[Control]:
 	var result: Array[Control] = []
 	if node is Control and node.focus_mode != Control.FOCUS_NONE:
-		# Only collect leaf panes that are actual terminals (avoid containers)
-		if node.get_script() != null:
+		# Only collect terminal panes (they expose _get_layout_state)
+		if node is Control and node.has_method("_get_layout_state"):
 			result.append(node)
 	for child in node.get_children():
 		result.append_array(_collect_panes(child))

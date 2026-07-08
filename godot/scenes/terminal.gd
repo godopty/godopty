@@ -1,4 +1,5 @@
 extends Node2D
+class_name TerminalRenderer
 # godopty Terminal Renderer
 # Monospace font, scrollback, cursor shapes, cell attributes.
 #

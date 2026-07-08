@@ -294,7 +294,6 @@ dependencies = [
  "log",
  "portable-pty",
  "regex",
- "thiserror 2.0.18",
  "tokio",
  "vte",
 ]

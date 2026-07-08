@@ -108,7 +108,7 @@ impl GodoptyTerminal {
     /// handles echo, backspace, and line buffering. For submitting a command
     /// (Enter key), use `send_line()`.
     #[func]
-    fn send_text(&mut self, text: GString) {
+    fn send_text(&self, text: GString) {
         if let Some(ref spawned) = self.spawned {
             spawned.handle.send_text(&text.to_string());
         }
@@ -119,7 +119,7 @@ impl GodoptyTerminal {
     /// Use this for the Enter key to submit a command, or for concept-triggered
     /// action commands.
     #[func]
-    fn send_line(&mut self, text: GString) {
+    fn send_line(&self, text: GString) {
         if let Some(ref spawned) = self.spawned {
             spawned.handle.send_line(&text.to_string());
         }

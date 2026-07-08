@@ -1,4 +1,5 @@
 extends Control
+class_name Workspace
 # godopty Workspace — tiling grid of terminal panes with title bars.
 
 const LAYOUT_FILE = "user://layout.json"
