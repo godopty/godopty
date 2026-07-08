@@ -108,28 +108,14 @@ func _process(delta):
 	var gen = _terminal.get_grid_generation()
 	if gen != _last_grid_gen:
 		_last_grid_gen = gen
-		var new_grid = _terminal.get_grid_rows()
-		if _cell_changed(new_grid):
-			_cell_cache = new_grid
-			_cursor_visible = true
-			_cursor_blink_timer = 0.0
+		_cell_cache = _terminal.get_grid_rows()
+		_cursor_visible = true
+		_cursor_blink_timer = 0.0
 	queue_redraw()
 
 	var t = _terminal.get_title()
 	if t != _last_title and t != "":
 		_last_title = t; title_changed.emit(t)
-
-func _cell_changed(new_grid: Array) -> bool:
-	if _cell_cache.size() != new_grid.size(): return true
-	for r in new_grid.size():
-		var nr: Array = new_grid[r]; var or_: Array = _cell_cache[r]
-		if nr.size() != or_.size(): return true
-		for c in nr.size():
-			var nc: Dictionary = nr[c]; var oc: Dictionary = or_[c]
-			if nc["ch"] != oc["ch"] or nc["fg"] != oc["fg"] or nc["bg"] != oc["bg"]: return true
-			if nc.get("bold", false) != oc.get("bold", false): return true
-			if nc.get("inverse", false) != oc.get("inverse", false): return true
-	return false
 
 func _grid_offset() -> Vector2:
 	var gc = _cell_cache[0].size() if _cell_cache.size() > 0 else 1
