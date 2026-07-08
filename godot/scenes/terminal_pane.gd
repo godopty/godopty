@@ -17,6 +17,9 @@ const UNDERLINE_CURSOR_HEIGHT = 3
 const PRINTABLE_ASCII_MIN = 32
 const PRINTABLE_ASCII_MAX = 126
 
+@export var beam_cursor_width: int = BEAM_CURSOR_WIDTH
+@export var underline_cursor_height: int = UNDERLINE_CURSOR_HEIGHT
+
 @export var shell_command: String = "/bin/bash"
 @export var rows: int = 24
 @export var cols: int = 80
@@ -187,9 +190,9 @@ func _draw_cursor(off: Vector2, baseline: float):
 			if cursor_ch != " " and cursor_ch != "":
 				draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
 		1:
-			draw_rect(Rect2(cx, cy + _cell_h - UNDERLINE_CURSOR_HEIGHT, _cell_w, UNDERLINE_CURSOR_HEIGHT), cursor_color)
+			draw_rect(Rect2(cx, cy + _cell_h - underline_cursor_height, _cell_w, underline_cursor_height), cursor_color)
 		2:
-			draw_rect(Rect2(cx, cy, BEAM_CURSOR_WIDTH, _cell_h), cursor_color)
+			draw_rect(Rect2(cx, cy, beam_cursor_width, _cell_h), cursor_color)
 		_:
 			draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
 			if cursor_ch != " " and cursor_ch != "":

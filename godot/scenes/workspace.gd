@@ -52,6 +52,8 @@ var _cfg_cursor_blink_speed := 0.5
 var _cfg_scroll_lines := 3
 var _cfg_default_rows := 24
 var _cfg_default_cols := 80
+var _cfg_beam_width := 2
+var _cfg_underline_height := 3
 var _cfg_font_size := 14
 
 var _sidebar: Control
@@ -456,10 +458,12 @@ func _load_settings():
 		_cfg_scroll_lines = d.get("scroll_lines", 3)
 		_cfg_default_rows = d.get("default_rows", 24)
 		_cfg_default_cols = d.get("default_cols", 80)
+		_cfg_beam_width = d.get("beam_width", 2)
+		_cfg_underline_height = d.get("underline_height", 3)
 		_cfg_font_size = d.get("font_size", 14)
 
 func _save_settings():
-	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "font_size": _cfg_font_size}
+	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "beam_width": _cfg_beam_width, "underline_height": _cfg_underline_height, "font_size": _cfg_font_size}
 	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d))
 
@@ -470,6 +474,8 @@ func _apply_settings_to(body: Control):
 	body.scroll_lines = _cfg_scroll_lines
 	body.rows = _cfg_default_rows
 	body.cols = _cfg_default_cols
+	body.beam_cursor_width = _cfg_beam_width
+	body.underline_cursor_height = _cfg_underline_height
 	body.font_size = _cfg_font_size
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -502,6 +508,7 @@ func _build_settings() -> Control:
 	var fs_spin = _add_font_control(v)
 	var scroll_spin = _add_scroll_control(v)
 	var dims = _add_dims_control(v)
+	var cursor_px = _add_cursor_thickness_control(v)
 
 	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
 	# only trigger one save + propagate cycle.
@@ -510,7 +517,7 @@ func _build_settings() -> Control:
 	_settings_debounce_timer.one_shot = true
 	_settings_debounce_timer.wait_time = SETTINGS_DEBOUNCE
 	_settings_debounce_timer.timeout.connect(func():
-		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value), blink_spin.value, int(scroll_spin.value), int(dims[0].value), int(dims[1].value)))
+		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value), blink_spin.value, int(scroll_spin.value), int(dims[0].value), int(dims[1].value), int(cursor_px[0].value), int(cursor_px[1].value)))
 	bg.add_child(_settings_debounce_timer)
 
 	# Wire controls to debounced apply
@@ -521,7 +528,7 @@ func _build_settings() -> Control:
 	scroll_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
 
 	# Reset
-	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, dims, fs_spin)
+	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, dims, cursor_px, fs_spin)
 
 	bg.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
@@ -597,7 +604,23 @@ func _add_dims_control(v: VBoxContainer) -> Array:
 	v.add_child(hr)
 	return [rspin, cspin]
 
-func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, fs_spin: SpinBox):
+func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
+	var hc = HBoxContainer.new()
+	hc.add_child(_lbl("Cursor px:", 13))
+	var bspin = SpinBox.new()
+	bspin.min_value = 1; bspin.max_value = 8
+	bspin.value = _cfg_beam_width
+	hc.add_child(bspin)
+	hc.add_child(_lbl("beam", 11))
+	var uspin = SpinBox.new()
+	uspin.min_value = 1; uspin.max_value = 8
+	uspin.value = _cfg_underline_height
+	hc.add_child(uspin)
+	hc.add_child(_lbl("underline", 11))
+	v.add_child(hc)
+	return [bspin, uspin]
+
+func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, cursor_px: Array, fs_spin: SpinBox):
 	var btn = Button.new(); btn.text = "Reset to defaults"
 	btn.pressed.connect(func():
 		_cfg_cursor_shape = 0
@@ -606,6 +629,8 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		_cfg_scroll_lines = 3
 		_cfg_default_rows = 24
 		_cfg_default_cols = 80
+		_cfg_beam_width = 2
+		_cfg_underline_height = 3
 		_cfg_font_size = 14
 		_save_settings()
 		shape_opt.selected = 0
@@ -614,18 +639,22 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		scroll_spin.value = 3
 		dims[0].value = 24
 		dims[1].value = 80
+		cursor_px[0].value = 2
+		cursor_px[1].value = 3
 		fs_spin.value = 14
 		var all2: Array[Control] = []; _collect_bodies(all2)
 		for body in all2: _apply_settings_to(body))
 	v.add_child(btn)
 
-func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int, blink_speed: float, scroll_lines: int, default_rows: int, default_cols: int):
+func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int, blink_speed: float, scroll_lines: int, default_rows: int, default_cols: int, beam_width: int, underline_height: int):
 	_cfg_cursor_shape = cursor_shape
 	_cfg_cursor_blink = cursor_blink
 	_cfg_cursor_blink_speed = blink_speed
 	_cfg_scroll_lines = scroll_lines
 	_cfg_default_rows = default_rows
 	_cfg_default_cols = default_cols
+	_cfg_beam_width = beam_width
+	_cfg_underline_height = underline_height
 	_cfg_font_size = font_size
 	_save_settings()
 	var all2: Array[Control] = []; _collect_bodies(all2)
