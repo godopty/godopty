@@ -3,6 +3,18 @@ extends Control
 
 signal title_changed(new_title: String)
 
+const CURSOR_BLINK_INTERVAL = 0.5
+const SCROLL_LINES = 3
+const PADDING = 4
+const FOCUS_BORDER_COLOR = Color(0.4, 0.7, 1.0, 0.3)
+const FOCUS_BORDER_WIDTH = 2.0
+const SELECTION_COLOR = Color(0.3, 0.5, 1.0, 0.4)
+const SCROLLBACK_INDICATOR_COLOR = Color.YELLOW
+const BEAM_CURSOR_WIDTH = 2
+const UNDERLINE_CURSOR_HEIGHT = 3
+const PRINTABLE_ASCII_MIN = 32
+const PRINTABLE_ASCII_MAX = 126
+
 @export var shell_command: String = "/bin/bash"
 @export var rows: int = 24
 @export var cols: int = 80
@@ -53,8 +65,8 @@ func _ready():
 
 func _on_resize():
 	if _terminal == null or _cell_w == 0: return
-	var new_cols = maxi(int((size.x - 4) / _cell_w), 1)
-	var new_rows = maxi(int((size.y - 4) / _cell_h), 1)
+	var new_cols = maxi(int((size.x - PADDING) / _cell_w), 1)
+	var new_rows = maxi(int((size.y - PADDING) / _cell_h), 1)
 	if new_cols != cols or new_rows != rows:
 		cols = new_cols; rows = new_rows
 		_terminal.resize_grid(rows, cols)
@@ -78,12 +90,12 @@ func _recompute_cell_metrics():
 	_font_italic.fixed_size = font_size
 	_cell_w = _font.get_char_size('W'.unicode_at(0), font_size).x
 	_cell_h = _font.get_height(font_size)
-	custom_minimum_size = Vector2(4 * _cell_w + 4, _cell_h * 2 + 4)
+	custom_minimum_size = Vector2(PADDING * _cell_w + PADDING, _cell_h * 2 + PADDING)
 
 func _process(delta):
 	if cursor_blink:
 		_cursor_blink_timer += delta
-		if _cursor_blink_timer > 0.5:
+		if _cursor_blink_timer > CURSOR_BLINK_INTERVAL:
 			_cursor_blink_timer = 0.0
 			_cursor_visible = not _cursor_visible
 	else:
@@ -118,7 +130,7 @@ func _grid_offset() -> Vector2:
 	var gc = _cell_cache[0].size() if _cell_cache.size() > 0 else 1
 	var gr = _cell_cache.size()
 	var tw = gc * _cell_w; var th = gr * _cell_h
-	return Vector2(2 + maxf((size.x - 4 - tw) / 2.0, 0), 2 + maxf((size.y - 4 - th) / 2.0, 0))
+	return Vector2(2 + maxf((size.x - PADDING - tw) / 2.0, 0), 2 + maxf((size.y - PADDING - th) / 2.0, 0))
 
 func _draw():
 	if _cell_cache.is_empty(): return
@@ -150,7 +162,7 @@ func _draw():
 
 	# Focus border
 	if has_focus():
-		draw_rect(Rect2(0, 0, size.x, size.y), Color(0.4, 0.7, 1.0, 0.3), false, 2.0)
+		draw_rect(Rect2(0, 0, size.x, size.y), FOCUS_BORDER_COLOR, false, FOCUS_BORDER_WIDTH)
 
 	# Cursor
 	if _cursor_visible:
@@ -168,9 +180,9 @@ func _draw():
 					if cursor_ch != " " and cursor_ch != "":
 						draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
 				1:
-					draw_rect(Rect2(cx, cy + _cell_h - 3, _cell_w, 3), cursor_color)
+					draw_rect(Rect2(cx, cy + _cell_h - UNDERLINE_CURSOR_HEIGHT, _cell_w, UNDERLINE_CURSOR_HEIGHT), cursor_color)
 				2:
-					draw_rect(Rect2(cx, cy, 2, _cell_h), cursor_color)
+					draw_rect(Rect2(cx, cy, BEAM_CURSOR_WIDTH, _cell_h), cursor_color)
 				_:
 					draw_rect(Rect2(cx, cy, _cell_w, _cell_h), cursor_color)
 					if cursor_ch != " " and cursor_ch != "":
@@ -181,7 +193,7 @@ func _draw():
 	if so > 0:
 		draw_string(_font, Vector2(off.x + _cell_w * 0.5, off.y + _cell_h * 0.5),
 			"[Scroll: %d/%d lines]" % [so, _terminal.get_history_size()],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.YELLOW)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, SCROLLBACK_INDICATOR_COLOR)
 
 	# Selection
 	if _sel_start.x >= 0 and _sel_end.x >= 0:
@@ -192,7 +204,7 @@ func _draw():
 			var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1) + 1
 			for c in range(cb, ce):
 				if c >= 0 and c < cols:
-					draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), Color(0.3, 0.5, 1.0, 0.4))
+					draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), SELECTION_COLOR)
 
 func _mouse_to_cell(pos: Vector2) -> Vector2i:
 	var off = _grid_offset()
@@ -220,8 +232,8 @@ func _gui_input(event):
 				grab_focus(); _selecting = true
 				_sel_start = _mouse_to_cell(event.position); _sel_end = _sel_start; queue_redraw()
 			else: _selecting = false; queue_redraw()
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed: _terminal.scroll_up(3)
-		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed: _terminal.scroll_down(3)
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed: _terminal.scroll_up(SCROLL_LINES)
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed: _terminal.scroll_down(SCROLL_LINES)
 	if event is InputEventMouseMotion and _selecting:
 		_sel_end = _mouse_to_cell(event.position); queue_redraw()
 
@@ -244,7 +256,7 @@ func _gui_input(event):
 		if tx != "": _terminal.send_text(tx); accept_event()
 
 func _key_to_text(event: InputEventKey) -> String:
-	if event.unicode >= 32 and event.unicode <= 126: return char(event.unicode)
+	if event.unicode >= PRINTABLE_ASCII_MIN and event.unicode <= PRINTABLE_ASCII_MAX: return char(event.unicode)
 	match event.keycode:
 		KEY_BACKSPACE: return "\u007f"
 		KEY_TAB: return "\t"

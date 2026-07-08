@@ -18,12 +18,20 @@ use godopty_core::engine::{SpawnedTerminal, WorkspaceEngine};
 use godopty_core::types::TerminalConfig;
 
 // ═══════════════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════════════
+
+const TOKIO_WORKERS: usize = 2;
+const MIN_DIM: i64 = 1;
+const RGB_SCALE: f32 = 1.0 / 255.0;
+
+// ═══════════════════════════════════════════════════════════════════════
 // Global tokio runtime + engine
 // ═══════════════════════════════════════════════════════════════════════
 
 static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
+        .worker_threads(TOKIO_WORKERS)
         .enable_all()
         .build()
         .expect("failed to start tokio runtime")
@@ -73,8 +81,8 @@ impl GodoptyTerminal {
             labels: Vec::new(),
         };
 
-        let rows = rows.max(1) as usize;
-        let cols = cols.max(1) as usize;
+        let rows = rows.max(MIN_DIM) as usize;
+        let cols = cols.max(MIN_DIM) as usize;
 
         log::info!("[GDExt] Starting PTY {id}: {command} ({rows}×{cols})");
 
@@ -173,8 +181,8 @@ impl GodoptyTerminal {
     /// Sends SIGWINCH to the child process so bash/zsh reflows.
     #[func]
     fn resize_grid(&mut self, rows: i64, cols: i64) {
-        let rows = rows.max(1) as usize;
-        let cols = cols.max(1) as usize;
+        let rows = rows.max(MIN_DIM) as usize;
+        let cols = cols.max(MIN_DIM) as usize;
         self.with_grid_mut(|g| g.resize(rows, cols));
         if let Some(ref spawned) = self.spawned {
             spawned.handle.resize_pty(rows as u16, cols as u16);
@@ -251,17 +259,17 @@ impl GodoptyTerminal {
                         dict.set(
                             "fg",
                             &Variant::from(Color::from_rgb(
-                                cell.fg[0] as f32 / 255.0,
-                                cell.fg[1] as f32 / 255.0,
-                                cell.fg[2] as f32 / 255.0,
+                                cell.fg[0] as f32 * RGB_SCALE,
+                                cell.fg[1] as f32 * RGB_SCALE,
+                                cell.fg[2] as f32 * RGB_SCALE,
                             )),
                         );
                         dict.set(
                             "bg",
                             &Variant::from(Color::from_rgb(
-                                cell.bg[0] as f32 / 255.0,
-                                cell.bg[1] as f32 / 255.0,
-                                cell.bg[2] as f32 / 255.0,
+                                cell.bg[0] as f32 * RGB_SCALE,
+                                cell.bg[1] as f32 * RGB_SCALE,
+                                cell.bg[2] as f32 * RGB_SCALE,
                             )),
                         );
                         dict.set("bold", &Variant::from(cell.bold));

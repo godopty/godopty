@@ -269,6 +269,13 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Notification/warning system** — toast messages for errors and limits
 - [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
 
+### User Settings
+- [ ] **Cursor blink speed** — make the blink interval configurable (currently 0.5 s)
+- [ ] **Scroll wheel sensitivity** — make scroll lines-per-tick configurable (currently 3)
+- [ ] **Default terminal dimensions** — make new-pane rows×cols configurable (currently 24×80)
+- [ ] **Cursor thickness** — configurable beam cursor width (2 px) and underline height (3 px)
+- [ ] **UI theme colors** — expose wrapper, title-bar, sidebar, focus-border, selection, and scrollback-indicator colors
+
 ### Repository
 - [ ] **CONTRIBUTING.md** — setup instructions, PR process, and code style guide for contributors
 - [ ] **`.github/` directory** — issue templates (bug report, feature request) and pull request template

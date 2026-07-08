@@ -7,6 +7,41 @@ const DEFAULT_SHELL = "/bin/bash"
 const GRID = 12
 const MIN_TILE = 2
 
+# Default terminal dimensions
+const DEFAULT_ROWS = 24
+const DEFAULT_COLS = 80
+
+# Layout
+const SIDEBAR_WIDTH = 180
+const SIDEBAR_COLLAPSED_WIDTH = 20
+const TITLE_BAR_HEIGHT = 26
+const BUTTON_MIN_WIDTH = 22
+const BUTTON_MIN_HEIGHT = 18
+
+# Colors
+const WRAPPER_BG_COLOR = Color(0.1, 0.1, 0.1, 1.0)
+const TITLE_BAR_BG_COLOR = Color(0.18, 0.18, 0.20, 1.0)
+const WRAPPER_BORDER_COLOR = Color(0.25, 0.25, 0.25, 0.6)
+const SIDEBAR_BG_COLOR = Color(0.12, 0.12, 0.15, 1.0)
+
+# UI sizes
+const SETTINGS_PANEL_W = 320
+const SETTINGS_PANEL_H = 260
+const PALETTE_PANEL_W = 350
+const PALETTE_PANEL_H = 240
+const MIN_FONT_SIZE = 8
+const MAX_FONT_SIZE = 32
+const MIN_WINDOW_W = 500
+const MIN_WINDOW_H = 300
+
+# Timing
+const SETTINGS_DEBOUNCE = 0.15
+const TOAST_DURATION = 2.0
+const TOAST_DELAY = 1.5
+
+# Content
+const PALETTE_COMMANDS = ["new terminal", "close active", "settings", "reset layout", "save", "load"]
+
 # Default settings (overridden by settings.json)
 var _cfg_cursor_shape := 0
 var _cfg_cursor_blink := true
@@ -22,7 +57,7 @@ var _tiles: Array = []  # [{wrapper, col, row, cspan, rspan}]
 
 func _ready():
 	show()
-	DisplayServer.window_set_min_size(Vector2i(500, 300))
+	DisplayServer.window_set_min_size(Vector2i(MIN_WINDOW_W, MIN_WINDOW_H))
 	_load_settings()
 
 	_grid = Control.new()
@@ -43,7 +78,7 @@ func _notification(what):
 
 func _apply_layout():
 	if _grid == null: return
-	var m = 180 if _sidebar_on else 20
+	var m = SIDEBAR_WIDTH if _sidebar_on else SIDEBAR_COLLAPSED_WIDTH
 	_grid.offset_left = m; _grid.offset_right = 0
 	_grid.offset_top = 0; _grid.offset_bottom = 0
 	_grid.anchor_left = 0.0; _grid.anchor_right = 1.0
@@ -167,10 +202,10 @@ func _reset():
 func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	var root = PanelContainer.new()
 	var sb = StyleBoxFlat.new()
-	sb.bg_color = Color(0.1, 0.1, 0.1, 1.0)
+	sb.bg_color = WRAPPER_BG_COLOR
 	sb.border_width_left = 1; sb.border_width_right = 1
 	sb.border_width_top = 1; sb.border_width_bottom = 1
-	sb.border_color = Color(0.25, 0.25, 0.25, 0.6)
+	sb.border_color = WRAPPER_BORDER_COLOR
 	root.add_theme_stylebox_override("panel", sb)
 
 	var vbox = VBoxContainer.new()
@@ -180,10 +215,10 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	root.add_child(vbox)
 
 	var bar = Control.new()
-	bar.custom_minimum_size = Vector2(0, 26)
+	bar.custom_minimum_size = Vector2(0, TITLE_BAR_HEIGHT)
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var tbg = ColorRect.new()
-	tbg.color = Color(0.18, 0.18, 0.20, 1.0)
+	tbg.color = TITLE_BAR_BG_COLOR
 	tbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bar.add_child(tbg)
 	var center = CenterContainer.new()
@@ -205,7 +240,7 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	]:
 		var btn = Button.new()
 		btn.text = item[0]; btn.flat = true; btn.focus_mode = Control.FOCUS_NONE
-		btn.custom_minimum_size = Vector2(22, 18)
+		btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 		btn.pressed.connect(item[1]); hbox.add_child(btn)
 
 	var term = load("res://scenes/terminal_pane.gd").new()
@@ -234,7 +269,7 @@ func _show_message(msg: String):
 	lbl.position = Vector2(200, size.y - 30)
 	add_child(lbl)
 	var t = create_tween()
-	t.tween_property(lbl, "modulate:a", 0.0, 2.0).set_delay(1.5)
+	t.tween_property(lbl, "modulate:a", 0.0, TOAST_DURATION).set_delay(TOAST_DELAY)
 	t.tween_callback(lbl.queue_free)
 
 func _toggle_minimize(w: Control):
@@ -247,13 +282,13 @@ func _toggle_minimize(w: Control):
 
 func _build_sidebar():
 	var sbg = ColorRect.new()
-	sbg.name = "SidebarBg"; sbg.color = Color(0.12, 0.12, 0.15, 1.0)
-	sbg.size = Vector2(180, 0); sbg.anchor_top = 0.0; sbg.anchor_bottom = 1.0; sbg.anchor_right = 0.0
+	sbg.name = "SidebarBg"; sbg.color = SIDEBAR_BG_COLOR
+	sbg.size = Vector2(SIDEBAR_WIDTH, 0); sbg.anchor_top = 0.0; sbg.anchor_bottom = 1.0; sbg.anchor_right = 0.0
 	add_child(sbg)
 	_sidebar_bg = sbg
 
 	_sidebar = Control.new()
-	_sidebar.offset_right = 180
+	_sidebar.offset_right = SIDEBAR_WIDTH
 	_sidebar.clip_contents = true; _sidebar.anchor_top = 0.0; _sidebar.anchor_bottom = 1.0
 	add_child(_sidebar)
 
@@ -269,7 +304,7 @@ func _build_sidebar():
 	header.add_child(title)
 	var arrow = Button.new()
 	arrow.text = "◀"; arrow.name = "SidebarArrow"
-	arrow.custom_minimum_size = Vector2(22, 22)
+	arrow.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_WIDTH)
 	arrow.pressed.connect(_toggle_sidebar)
 	header.add_child(arrow)
 	v.add_child(header)
@@ -295,7 +330,7 @@ func _build_sidebar():
 	# Collapsed-state button — direct child of sidebar, only visible when collapsed
 	var coll_btn = Button.new()
 	coll_btn.text = "▶"; coll_btn.name = "SidebarCollapsedBtn"
-	coll_btn.custom_minimum_size = Vector2(18, 22)
+	coll_btn.custom_minimum_size = Vector2(BUTTON_MIN_HEIGHT, BUTTON_MIN_WIDTH)
 	coll_btn.offset_left = 1; coll_btn.offset_top = 2
 	coll_btn.offset_right = 19; coll_btn.visible = false
 	coll_btn.pressed.connect(_toggle_sidebar)
@@ -322,7 +357,7 @@ func _list():
 		btn.pressed.connect(func(b = body): b.grab_focus())
 		row.add_child(btn)
 		var x = Button.new(); x.text = "✕"; x.flat = true
-		x.custom_minimum_size = Vector2(22, 0)
+		x.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, 0)
 		x.pressed.connect(func(b = body): _kill(b))
 		row.add_child(x)
 		pl.add_child(row)
@@ -334,13 +369,13 @@ func _toggle_sidebar():
 	var a = _sidebar.get_node_or_null("SidebarArrow")
 	var coll = _sidebar.get_node_or_null("SidebarCollapsedBtn")
 	if _sidebar_on:
-		_sidebar.offset_right = 180; _sidebar_bg.size.x = 180
+		_sidebar.offset_right = SIDEBAR_WIDTH; _sidebar_bg.size.x = SIDEBAR_WIDTH
 		if content: content.show()
 		if title: title.visible = true
 		if a: a.visible = true
 		if coll: coll.visible = false
 	else:
-		_sidebar.offset_right = 20; _sidebar_bg.size.x = 20
+		_sidebar.offset_right = SIDEBAR_COLLAPSED_WIDTH; _sidebar_bg.size.x = SIDEBAR_COLLAPSED_WIDTH
 		if content: content.hide()
 		if title: title.visible = false
 		if a: a.visible = false
@@ -356,7 +391,7 @@ func _save():
 	for t in _tiles:
 		var body = _find_body(t.wrapper)
 		var d = {col = t.col, row = t.row, cspan = t.cspan, rspan = t.rspan,
-			shell = DEFAULT_SHELL, rows = 24, cols = 80}
+			shell = DEFAULT_SHELL, rows = DEFAULT_ROWS, cols = DEFAULT_COLS}
 		if body.has_method("_get_layout_state"):
 			var s = body._get_layout_state()
 			if s is Dictionary: d.merge(s)
@@ -378,7 +413,7 @@ func _restore():
 		if not (td is Dictionary): continue
 		var sh = td.get("shell", DEFAULT_SHELL)
 		if sh == null or sh == "": sh = DEFAULT_SHELL
-		var w = _build_wrapper(sh, td.get("rows", 24), td.get("cols", 80))
+		var w = _build_wrapper(sh, td.get("rows", DEFAULT_ROWS), td.get("cols", DEFAULT_COLS))
 		_grid.add_child(w)
 		var body = _find_body(w)
 		body.focus_entered.connect(func(b = body): _last_body = b)
@@ -422,7 +457,7 @@ func _open_settings():
 
 func _build_settings() -> Control:
 	var bg = Panel.new()
-	bg.size = Vector2(320, 260)
+	bg.size = Vector2(SETTINGS_PANEL_W, SETTINGS_PANEL_H)
 	bg.position = (size - bg.size) * 0.5
 
 	var v = VBoxContainer.new(); v.name = "VBox"
@@ -455,7 +490,7 @@ func _build_settings() -> Control:
 	var hf = HBoxContainer.new()
 	hf.add_child(_lbl("Font size:", 13))
 	var fs_spin = SpinBox.new(); fs_spin.name = "FontSpin"
-	fs_spin.min_value = 8; fs_spin.max_value = 32
+	fs_spin.min_value = MIN_FONT_SIZE; fs_spin.max_value = MAX_FONT_SIZE
 	fs_spin.value = _cfg_font_size
 	hf.add_child(fs_spin)
 	v.add_child(hf)
@@ -465,7 +500,7 @@ func _build_settings() -> Control:
 	_settings_debounce_timer = Timer.new()
 	_settings_debounce_timer.name = "DebounceTimer"
 	_settings_debounce_timer.one_shot = true
-	_settings_debounce_timer.wait_time = 0.15
+	_settings_debounce_timer.wait_time = SETTINGS_DEBOUNCE
 	_settings_debounce_timer.timeout.connect(func():
 		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value)))
 	bg.add_child(_settings_debounce_timer)
@@ -525,13 +560,13 @@ func _toggle_palette():
 	if _palette.visible: _palette.get_node("PaletteVBox/LineEdit").grab_focus()
 
 func _build_palette() -> Control:
-	var bg = Panel.new(); bg.size = Vector2(350, 240); bg.position = (size - bg.size) * 0.5
+	var bg = Panel.new(); bg.size = Vector2(PALETTE_PANEL_W, PALETTE_PANEL_H); bg.position = (size - bg.size) * 0.5
 	var v = VBoxContainer.new(); v.name = "PaletteVBox"; bg.add_child(v)
 	var inp = LineEdit.new(); inp.placeholder_text = "Command..."; v.add_child(inp)
 	var lst = ItemList.new(); lst.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(lst)
-	for c in ["new terminal", "close active", "reset layout", "save", "load"]: lst.add_item(c)
+	for c in PALETTE_COMMANDS: lst.add_item(c)
 	inp.text_changed.connect(func(t: String):
-		lst.clear(); for c in ["new terminal", "close active", "reset layout", "save", "load"]:
+		lst.clear(); for c in PALETTE_COMMANDS:
 			if t == "" or c.find(t) != -1: lst.add_item(c))
 	inp.text_submitted.connect(func(t: String): _run(t); _palette.visible = false)
 	lst.item_activated.connect(func(i: int): _run(lst.get_item_text(i)); _palette.visible = false)

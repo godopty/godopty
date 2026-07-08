@@ -5,6 +5,15 @@ extends Node2D
 # All @export variables appear in the Godot editor Inspector and can be
 # set per-terminal-instance.
 
+const CURSOR_BLINK_INTERVAL = 0.5
+const SCROLL_LINES = 3
+const SELECTION_COLOR = Color(0.3, 0.5, 1.0, 0.4)
+const SCROLLBACK_INDICATOR_COLOR = Color.YELLOW
+const BEAM_CURSOR_WIDTH = 2
+const UNDERLINE_CURSOR_HEIGHT = 3
+const PRINTABLE_ASCII_MIN = 32
+const PRINTABLE_ASCII_MAX = 126
+
 @export var shell_command: String = "/bin/bash"
 @export var rows: int = 24
 @export var cols: int = 80
@@ -80,7 +89,7 @@ func _recompute_cell_metrics():
 func _process(delta):
 	if cursor_blink:
 		_cursor_blink_timer += delta
-		if _cursor_blink_timer > 0.5:
+		if _cursor_blink_timer > CURSOR_BLINK_INTERVAL:
 			_cursor_blink_timer = 0.0
 			_cursor_visible = not _cursor_visible
 	else:
@@ -170,9 +179,9 @@ func _draw():
 						draw_string(_font, Vector2(cx, cy + _cell_h - 2), cursor_ch,
 							HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
 				1: # Underline
-					draw_rect(Rect2(cx, cy + _cell_h - 3, _cell_w, 3), _cur_color)
+					draw_rect(Rect2(cx, cy + _cell_h - UNDERLINE_CURSOR_HEIGHT, _cell_w, UNDERLINE_CURSOR_HEIGHT), _cur_color)
 				2: # Beam (vertical bar)
-					draw_rect(Rect2(cx, cy, 2, _cell_h), _cur_color)
+					draw_rect(Rect2(cx, cy, BEAM_CURSOR_WIDTH, _cell_h), _cur_color)
 				_: # Default Block
 					draw_rect(Rect2(cx, cy, _cell_w, _cell_h), _cur_color)
 					if cursor_ch != " " and cursor_ch != "":
@@ -184,7 +193,7 @@ func _draw():
 	if offset > 0:
 		draw_string(_font, Vector2(_cell_w * 0.5, _cell_h * 0.5),
 			"[Scroll: %d/%d lines]" % [offset, _terminal.get_history_size()],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.YELLOW)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, SCROLLBACK_INDICATOR_COLOR)
 
 	# ── Selection highlight ──────────────────────────────────────────
 	if _sel_start.x >= 0 and _sel_end.x >= 0:
@@ -200,7 +209,7 @@ func _draw():
 			for c in range(c_begin, c_end):
 				if c >= 0 and c < cols:
 					draw_rect(Rect2(c * _cell_w, r * _cell_h, _cell_w, _cell_h),
-						Color(0.3, 0.5, 1.0, 0.4))
+						SELECTION_COLOR)
 
 func _mouse_to_cell(pos: Vector2) -> Vector2i:
 	return Vector2i(int(pos.x / _cell_w), int(pos.y / _cell_h))
@@ -240,9 +249,9 @@ func _input(event):
 				queue_redraw()
 
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			_terminal.scroll_up(3)
+			_terminal.scroll_up(SCROLL_LINES)
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-			_terminal.scroll_down(3)
+			_terminal.scroll_down(SCROLL_LINES)
 
 	if event is InputEventMouseMotion and _selecting:
 		_sel_end = _mouse_to_cell(event.position)
@@ -283,7 +292,7 @@ func _input(event):
 			_terminal.send_text(text)
 
 func _key_to_text(event: InputEventKey) -> String:
-	if event.unicode >= 32 and event.unicode <= 126:
+	if event.unicode >= PRINTABLE_ASCII_MIN and event.unicode <= PRINTABLE_ASCII_MAX:
 		return char(event.unicode)
 
 	match event.keycode:

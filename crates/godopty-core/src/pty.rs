@@ -4,6 +4,10 @@ use std::thread;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use tokio::sync::mpsc::UnboundedSender;
 
+const DEFAULT_ROWS: u16 = 24;
+const DEFAULT_COLS: u16 = 80;
+const READ_BUF_SIZE: usize = 4096;
+
 pub struct PtyHandle {
     pub id: u32,
     writer: Box<dyn Write + Send>,
@@ -22,7 +26,7 @@ impl PtyHandle {
         cmd.env("TERM", "xterm-256color");
 
         let pty_pair = pty_system.openpty(PtySize {
-            rows: 24, cols: 80, pixel_width: 0, pixel_height: 0,
+            rows: DEFAULT_ROWS, cols: DEFAULT_COLS, pixel_width: 0, pixel_height: 0,
         })?;
         let child = pty_pair.slave.spawn_command(cmd)?;
         let mut reader = pty_pair.master.try_clone_reader()?;
@@ -32,7 +36,7 @@ impl PtyHandle {
         let read_thread = thread::Builder::new()
             .name(format!("pty-reader-{id}"))
             .spawn(move || {
-                let mut buf = [0u8; 4096];
+                let mut buf = [0u8; READ_BUF_SIZE];
                 loop {
                     match reader.read(&mut buf) {
                         Ok(0) => break,

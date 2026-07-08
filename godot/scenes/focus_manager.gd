@@ -2,10 +2,8 @@ extends Node
 # Focus Manager — autoload singleton for geographic pane navigation.
 # Listens for Alt+Arrow to jump to the nearest pane in that direction.
 
-const ALT_ARROW_LEFT  = KEY_LEFT
-const ALT_ARROW_RIGHT = KEY_RIGHT
-const ALT_ARROW_UP    = KEY_UP
-const ALT_ARROW_DOWN  = KEY_DOWN
+const AXIS_ALIGNED_THRESHOLD = 50
+const DIAGONAL_PENALTY = 0.5
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -17,10 +15,10 @@ func _input(event):
 
 	var dir: Vector2
 	match event.keycode:
-		ALT_ARROW_LEFT:  dir = Vector2(-1, 0)
-		ALT_ARROW_RIGHT: dir = Vector2(1, 0)
-		ALT_ARROW_UP:    dir = Vector2(0, -1)
-		ALT_ARROW_DOWN:  dir = Vector2(0, 1)
+		KEY_LEFT:  dir = Vector2(-1, 0)
+		KEY_RIGHT: dir = Vector2(1, 0)
+		KEY_UP:    dir = Vector2(0, -1)
+		KEY_DOWN:  dir = Vector2(0, 1)
 		_: return
 
 	var current = get_viewport().gui_get_focus_owner()
@@ -52,8 +50,8 @@ func _input(event):
 		# Use Manhattan distance as tiebreaker; prefer straight-ahead panes
 		var dist = abs(delta.x) + abs(delta.y)
 		# Bonus for being axis-aligned (not diagonal)
-		if abs(delta.x) < 50 or abs(delta.y) < 50:
-			dist *= 0.5
+		if abs(delta.x) < AXIS_ALIGNED_THRESHOLD or abs(delta.y) < AXIS_ALIGNED_THRESHOLD:
+			dist *= DIAGONAL_PENALTY
 
 		if dist < best_dist:
 			best_dist = dist

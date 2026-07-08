@@ -16,6 +16,16 @@ use godopty_core::term::TermGrid;
 use godopty_core::types::{Action, Concept, TerminalConfig};
 use regex::Regex;
 
+// ── Demo constants ─────────────────────────────────────────────────────
+
+const MOCK_INTERVAL_MS: u64 = 2000;
+const OBSERVER_INTERVAL_MS: u64 = 5000;
+const STANDBY_INTERVAL_MS: u64 = 10000;
+const BASH_INIT_DELAY_SECS: u64 = 1;
+const DEMO_DURATION_SECS: u64 = 3;
+const GRID_ROWS: usize = 5;
+const GRID_COLS: usize = 40;
+
 #[tokio::main]
 async fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -51,7 +61,7 @@ async fn run_mock_demo() {
                 "thread 'main' panicked at src/main.rs:42".into(),
                 "FATAL kernel: segfault at 0x0 ip 00007f...".into(),
             ],
-            2000,
+            MOCK_INTERVAL_MS,
         )
         .await;
 
@@ -59,7 +69,7 @@ async fn run_mock_demo() {
         .spawn_mock_terminal(
             TerminalConfig { id: 2, labels: vec!["observer".into()] },
             vec!["[observer] watching for events...".into()],
-            5000,
+            OBSERVER_INTERVAL_MS,
         )
         .await;
 
@@ -67,7 +77,7 @@ async fn run_mock_demo() {
         .spawn_mock_terminal(
             TerminalConfig { id: 3, labels: vec!["backend".into()] },
             vec!["[backend standby] waiting for restart signal...".into()],
-            10000,
+            STANDBY_INTERVAL_MS,
         )
         .await;
 
@@ -103,7 +113,7 @@ async fn run_pty_demo() {
         .expect("Failed to spawn PTY for Terminal 2");
 
     log::info!("PTYs spawned. Waiting for bash to initialize...");
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(BASH_INIT_DELAY_SECS)).await;
 
     // Inject a command that triggers the port_conflict concept.
     // The chain: bash executes echo → vte parses output →
@@ -111,7 +121,7 @@ async fn run_pty_demo() {
     log::info!(">>> Injecting: echo 'ERROR: Address 8080 already in use'");
     term1.send_line("echo 'ERROR: Address 8080 already in use'");
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(DEMO_DURATION_SECS)).await;
     log::info!("Demo complete. Shutting down.");
 }
 
@@ -126,7 +136,7 @@ async fn run_pty_demo() {
 fn run_term_demo() {
     println!("=== godopty Phase 2a: Terminal Grid Demo ===\n");
 
-    let mut grid = TermGrid::new(5, 40);
+    let mut grid = TermGrid::new(GRID_ROWS, GRID_COLS);
 
     // Feed a string with SGR formatting:
     // - "Normal " in default colors
