@@ -501,6 +501,7 @@ func _build_settings() -> Control:
 	var blink_spin = _add_blink_speed_control(v)
 	var fs_spin = _add_font_control(v)
 	var scroll_spin = _add_scroll_control(v)
+	var dims = _add_dims_control(v)
 
 	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
 	# only trigger one save + propagate cycle.
@@ -580,6 +581,21 @@ func _add_scroll_control(v: VBoxContainer) -> SpinBox:
 	hs.add_child(spin)
 	v.add_child(hs)
 	return spin
+
+func _add_dims_control(v: VBoxContainer) -> Array:
+	var hr = HBoxContainer.new()
+	hr.add_child(_lbl("Default size:", 13))
+	var rspin = SpinBox.new()
+	rspin.min_value = 10; rspin.max_value = 100
+	rspin.value = _cfg_default_rows
+	hr.add_child(rspin)
+	hr.add_child(_lbl("×", 13))
+	var cspin = SpinBox.new()
+	cspin.min_value = 40; cspin.max_value = 200
+	cspin.value = _cfg_default_cols
+	hr.add_child(cspin)
+	v.add_child(hr)
+	return [rspin, cspin]
 
 func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, fs_spin: SpinBox):
 	var btn = Button.new(); btn.text = "Reset to defaults"
