@@ -40,7 +40,7 @@ var _terminal: GodoptyTerminal
 var _font: Font
 var _font_bold: Font
 var _font_italic: Font
-var _cell_cache: Array[Array] = []
+var _cell_cache: Array = []  # Array of Array[Dictionary] from gdext (untyped bridge)
 var _cell_w: float = 0.0
 var _cell_h: float = 0.0
 var _cursor_blink_timer: float = 0.0
