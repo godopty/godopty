@@ -434,6 +434,7 @@ func _restore():
 		var w = _build_wrapper(sh, td.get("rows", DEFAULT_ROWS), td.get("cols", DEFAULT_COLS))
 		_grid.add_child(w)
 		var body = _find_body(w)
+		_apply_settings_to(body)
 		body.focus_entered.connect(func(b = body): _last_body = b)
 		_tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),
 			cspan = td.get("cspan", GRID), rspan = td.get("rspan", GRID)})
