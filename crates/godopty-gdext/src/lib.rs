@@ -117,64 +117,74 @@ impl GodoptyTerminal {
         }
     }
 
+    // ── Grid access helpers ─────────────────────────────────────────
+
+    /// Lock the grid immutably, call `f`, return its result.
+    /// Returns `default` if no shell started or the mutex is poisoned.
+    fn with_grid<T>(&self, f: impl FnOnce(&godopty_core::term::TermGrid) -> T, default: T) -> T {
+        if let Some(ref spawned) = self.spawned {
+            match spawned.grid.lock() {
+                Ok(g) => f(&g),
+                Err(e) => {
+                    godot_error!("godopty: TermGrid lock poisoned: {e}");
+                    default
+                }
+            }
+        } else {
+            default
+        }
+    }
+
+    /// Lock the grid mutably and call `f`. No-op if no shell or lock poisoned.
+    fn with_grid_mut(&self, f: impl FnOnce(&mut godopty_core::term::TermGrid)) {
+        if let Some(ref spawned) = self.spawned {
+            match spawned.grid.lock() {
+                Ok(mut g) => f(&mut g),
+                Err(e) => godot_error!("godopty: TermGrid lock poisoned: {e}"),
+            }
+        }
+    }
+
     /// Cursor row position (0-based). Returns -1 if no shell or cursor hidden.
     #[func]
     fn get_cursor_row(&self) -> i64 {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                if let Some((row, _col)) = g.cursor_position() {
-                    return row as i64;
-                }
-            }
-        }
-        -1
+        self.with_grid(
+            |g| g.cursor_position().map(|(r, _)| r as i64).unwrap_or(-1),
+            -1,
+        )
     }
 
     /// Cursor column position (0-based). Returns -1 if no shell or cursor hidden.
     #[func]
     fn get_cursor_col(&self) -> i64 {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                if let Some((_row, col)) = g.cursor_position() {
-                    return col as i64;
-                }
-            }
-        }
-        -1
+        self.with_grid(
+            |g| g.cursor_position().map(|(_, c)| c as i64).unwrap_or(-1),
+            -1,
+        )
     }
 
     /// Cursor shape: 0 = Block, 1 = Underline, 2 = Beam.
     #[func]
     fn get_cursor_shape(&self) -> i64 {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                return g.cursor_shape() as i64;
-            }
-        }
-        -1
+        self.with_grid(|g| g.cursor_shape() as i64, -1)
     }
 
     /// Resize the terminal grid and PTY to `rows × cols`.
     /// Sends SIGWINCH to the child process so bash/zsh reflows.
     #[func]
     fn resize_grid(&mut self, rows: i64, cols: i64) {
+        let rows = rows.max(1) as usize;
+        let cols = cols.max(1) as usize;
+        self.with_grid_mut(|g| g.resize(rows, cols));
         if let Some(ref spawned) = self.spawned {
-            if let Ok(mut g) = spawned.grid.lock() {
-                g.resize(rows.max(1) as usize, cols.max(1) as usize);
-            }
-            spawned.handle.resize_pty(rows.max(1) as u16, cols.max(1) as u16);
+            spawned.handle.resize_pty(rows as u16, cols as u16);
         }
     }
 
     /// Terminal window title (from OSC escape sequences). Empty string if none set.
     #[func]
     fn get_title(&self) -> GString {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                return GString::from(&g.title());
-            }
-        }
-        GString::new()
+        self.with_grid(|g| GString::from(&g.title()), GString::new())
     }
 
     // ── Scrollback ──────────────────────────────────────────────────
@@ -182,75 +192,43 @@ impl GodoptyTerminal {
     /// Scroll up by `lines` (back in terminal history).
     #[func]
     fn scroll_up(&mut self, lines: i64) {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(mut g) = spawned.grid.lock() {
-                g.scroll_up(lines.max(0) as usize);
-            }
-        }
+        self.with_grid_mut(|g| g.scroll_up(lines.max(0) as usize));
     }
 
     /// Scroll down by `lines` (forward in terminal history).
     #[func]
     fn scroll_down(&mut self, lines: i64) {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(mut g) = spawned.grid.lock() {
-                g.scroll_down(lines.max(0) as usize);
-            }
-        }
+        self.with_grid_mut(|g| g.scroll_down(lines.max(0) as usize));
     }
 
     /// Reset scroll position to follow live output.
     #[func]
     fn scroll_reset(&mut self) {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(mut g) = spawned.grid.lock() {
-                g.scroll_reset();
-            }
-        }
+        self.with_grid_mut(|g| g.scroll_reset());
     }
 
     /// Current scrollback offset (lines above visible viewport).
     #[func]
     fn get_scroll_offset(&self) -> i64 {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                return g.display_offset() as i64;
-            }
-        }
-        0
+        self.with_grid(|g| g.display_offset() as i64, 0)
     }
 
     /// Total lines of scrollback history available.
     #[func]
     fn get_history_size(&self) -> i64 {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                return g.history_size() as i64;
-            }
-        }
-        0
+        self.with_grid(|g| g.history_size() as i64, 0)
     }
 
     /// Number of rows in the terminal grid (0 if no shell started).
     #[func]
     fn get_rows(&self) -> i64 {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                return g.num_rows() as i64;
-            }
-        }
-        0
+        self.with_grid(|g| g.num_rows() as i64, 0)
     }
 
     /// Number of columns in the terminal grid.
     #[func]
     fn get_cols(&self) -> i64 {
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
-                return g.num_cols() as i64;
-            }
-        }
-        0
+        self.with_grid(|g| g.num_cols() as i64, 0)
     }
 
     /// Return all rows as `Array[Array[Dictionary]]`.
@@ -262,10 +240,9 @@ impl GodoptyTerminal {
     /// - Returns `[]` if no shell started or grid lock is momentarily held.
     #[func]
     fn get_grid_rows(&self) -> Array<Variant> {
-        let mut result = Array::<Variant>::new();
-
-        if let Some(ref spawned) = self.spawned {
-            if let Ok(g) = spawned.grid.lock() {
+        self.with_grid(
+            |g| {
+                let mut result = Array::<Variant>::new();
                 for row in g.renderable_rows() {
                     let mut row_arr = Array::<Variant>::new();
                     for cell in row {
@@ -295,10 +272,10 @@ impl GodoptyTerminal {
                     }
                     result.push(&row_arr);
                 }
-            }
-        }
-
-        result
+                result
+            },
+            Array::<Variant>::new(),
+        )
     }
 }
 
