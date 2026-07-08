@@ -105,8 +105,8 @@ func _apply_layout():
 # Spawn / Kill
 # ═══════════════════════════════════════════════════════════════════════
 
-func _spawn(shell := DEFAULT_SHELL, rows := _cfg_default_rows, cols := _cfg_default_cols) -> Control:
-	var w = _build_wrapper(shell, rows, cols)
+func _spawn(shell := DEFAULT_SHELL) -> Control:
+	var w = _build_wrapper(shell, _cfg_default_rows, _cfg_default_cols)
 	if _tiles.is_empty():
 		_tiles.append({wrapper = w, col = 0, row = 0, cspan = GRID, rspan = GRID})
 	else:
