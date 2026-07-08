@@ -116,7 +116,6 @@ func _spawn(shell := DEFAULT_SHELL, rows := 24, cols := 80) -> Control:
 	_apply_layout()
 	_list()
 	var body = _find_body(w)
-	_apply_settings_to(body)
 	body.focus_entered.connect(func(): _last_body = body)
 	return body
 
@@ -225,6 +224,9 @@ func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
 	term.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	term.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(term)
+
+	# Apply global settings to every new terminal — no caller needs to remember
+	_apply_settings_to(term)
 
 	term.title_changed.connect(func(t: String): lbl.text = " " + t)
 
@@ -434,7 +436,6 @@ func _restore():
 		var w = _build_wrapper(sh, td.get("rows", DEFAULT_ROWS), td.get("cols", DEFAULT_COLS))
 		_grid.add_child(w)
 		var body = _find_body(w)
-		_apply_settings_to(body)
 		body.focus_entered.connect(func(b = body): _last_body = b)
 		_tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),
 			cspan = td.get("cspan", GRID), rspan = td.get("rspan", GRID)})
