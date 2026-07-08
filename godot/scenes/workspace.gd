@@ -2,9 +2,15 @@ extends Control
 # godopty Workspace — tiling grid of terminal panes with title bars.
 
 const LAYOUT_FILE = "user://layout.json"
+const SETTINGS_FILE = "user://settings.json"
 const DEFAULT_SHELL = "/bin/bash"
 const GRID = 12
 const MIN_TILE = 2
+
+# Default settings (overridden by settings.json)
+var _cfg_cursor_shape := 0
+var _cfg_cursor_blink := true
+var _cfg_font_size := 14
 
 var _sidebar: Control
 var _sidebar_bg: ColorRect
@@ -17,6 +23,7 @@ var _tiles: Array = []  # [{wrapper, col, row, cspan, rspan}]
 func _ready():
 	show()
 	DisplayServer.window_set_min_size(Vector2i(500, 300))
+	_load_settings()
 
 	_grid = Control.new()
 	add_child(_grid)
@@ -69,6 +76,7 @@ func _spawn(shell := DEFAULT_SHELL, rows := 24, cols := 80) -> Control:
 	_apply_layout()
 	_list()
 	var body = _find_body(w)
+	_apply_settings_to(body)
 	body.focus_entered.connect(func(): _last_body = body)
 	return body
 
@@ -268,6 +276,7 @@ func _build_sidebar():
 
 	for b in [
 		["+ Terminal", func(): var p = _spawn(); if p: p.grab_focus()],
+		["⚙ Settings", _open_settings],
 		["↺ Reset", _reset],
 	]:
 		var btn = Button.new(); btn.text = b[0]
@@ -294,6 +303,11 @@ func _build_sidebar():
 
 func _lbl(t: String, s: int) -> Label:
 	var l = Label.new(); l.text = t; l.add_theme_font_size_override("font_size", s); return l
+
+func _collect_bodies(out: Array):
+	for t in _tiles:
+		var body = _find_body(t.wrapper)
+		if body: out.append(body)
 
 func _list():
 	var pl = _sidebar.get_node_or_null("SidebarContent/PaneScroll/PaneList")
@@ -372,6 +386,122 @@ func _restore():
 			cspan = td.get("cspan", GRID), rspan = td.get("rspan", GRID)})
 	_apply_layout(); _list()
 
+func _load_settings():
+	if not FileAccess.file_exists(SETTINGS_FILE): return
+	var f = FileAccess.open(SETTINGS_FILE, FileAccess.READ)
+	if not f: return
+	var j = JSON.new()
+	if j.parse(f.get_as_text()) == OK and j.get_data() is Dictionary:
+		var d: Dictionary = j.get_data()
+		_cfg_cursor_shape = d.get("cursor_shape", 0)
+		_cfg_cursor_blink = d.get("cursor_blink", true)
+		_cfg_font_size = d.get("font_size", 14)
+
+func _save_settings():
+	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "font_size": _cfg_font_size}
+	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
+	if f: f.store_string(JSON.stringify(d))
+
+func _apply_settings_to(body: Control):
+	body.cursor_shape = _cfg_cursor_shape
+	body.cursor_blink = _cfg_cursor_blink
+	body.font_size = _cfg_font_size
+
+# ═══════════════════════════════════════════════════════════════════════
+# Settings panel
+# ═══════════════════════════════════════════════════════════════════════
+
+var _settings_panel: Control = null
+var _settings_debounce_timer: Timer = null
+
+func _open_settings():
+	if _settings_panel == null:
+		_settings_panel = _build_settings()
+		add_child(_settings_panel)
+	_settings_panel.visible = true
+
+func _build_settings() -> Control:
+	var bg = Panel.new()
+	bg.size = Vector2(320, 260)
+	bg.position = (size - bg.size) * 0.5
+
+	var v = VBoxContainer.new(); v.name = "VBox"
+	v.add_theme_constant_override("separation", 6)
+	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.add_child(v)
+
+	var h = HBoxContainer.new()
+	var t = Label.new(); t.text = "Global Settings"; t.add_theme_font_size_override("font_size", 18)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(t)
+	var x = Button.new(); x.text = "X"; x.flat = true
+	x.pressed.connect(func(): _settings_panel.visible = false); h.add_child(x)
+	v.add_child(h)
+
+	# Cursor shape
+	var hs = HBoxContainer.new()
+	hs.add_child(_lbl("Cursor:", 13))
+	var shape_opt = OptionButton.new(); shape_opt.name = "ShapeOpt"
+	shape_opt.add_item("Block"); shape_opt.add_item("Underline"); shape_opt.add_item("Beam")
+	shape_opt.selected = _cfg_cursor_shape
+	hs.add_child(shape_opt)
+	v.add_child(hs)
+
+	# Cursor blink
+	var blink_cb = CheckBox.new(); blink_cb.name = "BlinkCb"; blink_cb.text = " Cursor blink"
+	blink_cb.button_pressed = _cfg_cursor_blink
+	v.add_child(blink_cb)
+
+	# Font size
+	var hf = HBoxContainer.new()
+	hf.add_child(_lbl("Font size:", 13))
+	var fs_spin = SpinBox.new(); fs_spin.name = "FontSpin"
+	fs_spin.min_value = 8; fs_spin.max_value = 32
+	fs_spin.value = _cfg_font_size
+	hf.add_child(fs_spin)
+	v.add_child(hf)
+
+	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
+	# only trigger one save + propagate cycle.
+	_settings_debounce_timer = Timer.new()
+	_settings_debounce_timer.name = "DebounceTimer"
+	_settings_debounce_timer.one_shot = true
+	_settings_debounce_timer.wait_time = 0.15
+	_settings_debounce_timer.timeout.connect(func():
+		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value)))
+	bg.add_child(_settings_debounce_timer)
+
+	# Wire controls to debounced apply
+	shape_opt.item_selected.connect(func(_idx): _settings_debounce_timer.start())
+	blink_cb.toggled.connect(func(_pressed): _settings_debounce_timer.start())
+	fs_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
+
+	# Reset
+	var reset = Button.new(); reset.text = "Reset to defaults"
+	reset.pressed.connect(func():
+		_cfg_cursor_shape = 0
+		_cfg_cursor_blink = true
+		_cfg_font_size = 14
+		_save_settings()
+		shape_opt.selected = 0
+		blink_cb.button_pressed = true
+		fs_spin.value = 14
+		var all2 = []; _collect_bodies(all2)
+		for body in all2: _apply_settings_to(body))
+	v.add_child(reset)
+
+	bg.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
+			_settings_panel.visible = false)
+	return bg
+
+func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int):
+	_cfg_cursor_shape = cursor_shape
+	_cfg_cursor_blink = cursor_blink
+	_cfg_font_size = font_size
+	_save_settings()
+	var all2 = []; _collect_bodies(all2)
+	for body in all2: _apply_settings_to(body)
+
 # ═══════════════════════════════════════════════════════════════════════
 # Keyboard & palette
 # ═══════════════════════════════════════════════════════════════════════
@@ -392,11 +522,11 @@ func _input(event):
 func _toggle_palette():
 	if _palette == null: _palette = _build_palette(); add_child(_palette)
 	_palette.visible = not _palette.visible
-	if _palette.visible: _palette.get_node("LineEdit").grab_focus()
+	if _palette.visible: _palette.get_node("PaletteVBox/LineEdit").grab_focus()
 
 func _build_palette() -> Control:
 	var bg = Panel.new(); bg.size = Vector2(350, 240); bg.position = (size - bg.size) * 0.5
-	var v = VBoxContainer.new(); bg.add_child(v)
+	var v = VBoxContainer.new(); v.name = "PaletteVBox"; bg.add_child(v)
 	var inp = LineEdit.new(); inp.placeholder_text = "Command..."; v.add_child(inp)
 	var lst = ItemList.new(); lst.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(lst)
 	for c in ["new terminal", "close active", "reset layout", "save", "load"]: lst.add_item(c)
@@ -413,6 +543,7 @@ func _run(c: String):
 	match c:
 		"new terminal": var p = _spawn(); if p: p.grab_focus()
 		"close active": _kill_last()
+		"settings": _open_settings
 		"reset layout": _reset()
 		"save": _save();
 		"load": _restore()
