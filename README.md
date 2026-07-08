@@ -273,7 +273,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] ~~**Scroll wheel sensitivity**~~ — added `scroll_lines` setting (1–10, persisted to settings.json)
 - [ ] ~~**Default terminal dimensions**~~ — added `default_rows`/`default_cols` settings (10–100 × 40–200)
 - [ ] ~~**Cursor thickness**~~ — added `beam_width`/`underline_height` settings (1–8 px each)
-- [ ] **UI theme colors** — expose wrapper, title-bar, sidebar, focus-border, selection, and scrollback-indicator colors
+- [ ] ~~**UI theme colors**~~ — added 7 ColorPicker controls for wrapper, title bar, sidebar, focus, selection, and scrollback colors
 
 ### Repository
 - [ ] **CONTRIBUTING.md** — setup instructions, PR process, and code style guide for contributors
