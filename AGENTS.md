@@ -71,9 +71,9 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 - **Private members**: underscore prefix (`_cell_w`, `_settings_panel`)
 - **Config vars**: `_cfg_` prefix (`_cfg_cursor_shape`)
 - **Export pattern**: `@export var` for properties settable from Inspector or externally
-- **Settings persistence**: `user://settings.json` via `JSON.stringify`/`parse`
+- **Settings pipeline**: `_cfg_*` → `_save_settings()` → `user://settings.json`. To add a new setting: (1) add `_cfg_` var, (2) add UI control, (3) add one line to `_apply_settings_to()`. `_build_wrapper()` calls it automatically — no other wiring needed.
 - **Layout persistence**: `user://layout.json`
-- **Terminal spawning**: use `_spawn()` in workspace.gd; it wraps in a title-bar, applies settings, and registers in `_tiles`
+- **Terminal spawning**: `_build_wrapper()` is the sole entry point; all paths go through it
 
 ### Rust
 - **Edition**: 2024 (requires Rust ≥ 1.85)

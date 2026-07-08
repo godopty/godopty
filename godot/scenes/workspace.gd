@@ -50,6 +50,8 @@ var _cfg_cursor_shape := 0
 var _cfg_cursor_blink := true
 var _cfg_cursor_blink_speed := 0.5
 var _cfg_scroll_lines := 3
+var _cfg_default_rows := 24
+var _cfg_default_cols := 80
 var _cfg_font_size := 14
 
 var _sidebar: Control
@@ -103,7 +105,7 @@ func _apply_layout():
 # Spawn / Kill
 # ═══════════════════════════════════════════════════════════════════════
 
-func _spawn(shell := DEFAULT_SHELL, rows := 24, cols := 80) -> Control:
+func _spawn(shell := DEFAULT_SHELL, rows := _cfg_default_rows, cols := _cfg_default_cols) -> Control:
 	var w = _build_wrapper(shell, rows, cols)
 	if _tiles.is_empty():
 		_tiles.append({wrapper = w, col = 0, row = 0, cspan = GRID, rspan = GRID})
@@ -452,10 +454,12 @@ func _load_settings():
 		_cfg_cursor_blink = d.get("cursor_blink", true)
 		_cfg_cursor_blink_speed = d.get("cursor_blink_speed", 0.5)
 		_cfg_scroll_lines = d.get("scroll_lines", 3)
+		_cfg_default_rows = d.get("default_rows", 24)
+		_cfg_default_cols = d.get("default_cols", 80)
 		_cfg_font_size = d.get("font_size", 14)
 
 func _save_settings():
-	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "font_size": _cfg_font_size}
+	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "font_size": _cfg_font_size}
 	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d))
 
@@ -464,6 +468,8 @@ func _apply_settings_to(body: Control):
 	body.cursor_blink = _cfg_cursor_blink
 	body.cursor_blink_speed = _cfg_cursor_blink_speed
 	body.scroll_lines = _cfg_scroll_lines
+	body.rows = _cfg_default_rows
+	body.cols = _cfg_default_cols
 	body.font_size = _cfg_font_size
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -503,7 +509,7 @@ func _build_settings() -> Control:
 	_settings_debounce_timer.one_shot = true
 	_settings_debounce_timer.wait_time = SETTINGS_DEBOUNCE
 	_settings_debounce_timer.timeout.connect(func():
-		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value), blink_spin.value, int(scroll_spin.value)))
+		_apply_current_settings(shape_opt.selected, blink_cb.button_pressed, int(fs_spin.value), blink_spin.value, int(scroll_spin.value), int(dims[0].value), int(dims[1].value)))
 	bg.add_child(_settings_debounce_timer)
 
 	# Wire controls to debounced apply
@@ -514,7 +520,7 @@ func _build_settings() -> Control:
 	scroll_spin.value_changed.connect(func(_v): _settings_debounce_timer.start())
 
 	# Reset
-	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, fs_spin)
+	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, dims, fs_spin)
 
 	bg.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
@@ -575,29 +581,35 @@ func _add_scroll_control(v: VBoxContainer) -> SpinBox:
 	v.add_child(hs)
 	return spin
 
-func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, fs_spin: SpinBox):
+func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, fs_spin: SpinBox):
 	var btn = Button.new(); btn.text = "Reset to defaults"
 	btn.pressed.connect(func():
 		_cfg_cursor_shape = 0
 		_cfg_cursor_blink = true
 		_cfg_cursor_blink_speed = 0.5
 		_cfg_scroll_lines = 3
+		_cfg_default_rows = 24
+		_cfg_default_cols = 80
 		_cfg_font_size = 14
 		_save_settings()
 		shape_opt.selected = 0
 		blink_cb.button_pressed = true
 		blink_spin.value = 0.5
 		scroll_spin.value = 3
+		dims[0].value = 24
+		dims[1].value = 80
 		fs_spin.value = 14
 		var all2: Array[Control] = []; _collect_bodies(all2)
 		for body in all2: _apply_settings_to(body))
 	v.add_child(btn)
 
-func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int, blink_speed: float, scroll_lines: int):
+func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: int, blink_speed: float, scroll_lines: int, default_rows: int, default_cols: int):
 	_cfg_cursor_shape = cursor_shape
 	_cfg_cursor_blink = cursor_blink
 	_cfg_cursor_blink_speed = blink_speed
 	_cfg_scroll_lines = scroll_lines
+	_cfg_default_rows = default_rows
+	_cfg_default_cols = default_cols
 	_cfg_font_size = font_size
 	_save_settings()
 	var all2: Array[Control] = []; _collect_bodies(all2)
