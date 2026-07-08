@@ -135,17 +135,14 @@ impl TermGrid {
     /// This is the primary data structure passed to Godot's `_draw()`.
     pub fn renderable_rows(&self) -> Vec<Vec<CellInfo>> {
         let content = self.term.renderable_content();
+        let offset = self.term.grid().display_offset() as i32;
         let mut rows: Vec<Vec<CellInfo>> =
             vec![vec![CellInfo::default(); self.cols]; self.rows];
 
         for indexed in content.display_iter {
             // display_iter reports negative line numbers for history rows;
-            // detect them first to avoid wrapping on usize cast
-            let raw_line = indexed.point.line.0;
-            if raw_line < 0 {
-                continue;
-            }
-            let line = raw_line as usize;
+            // add the display offset to shift them into 0..self.rows range
+            let line = (indexed.point.line.0 + offset) as usize;
             let col = indexed.point.column.0 as usize;
 
             if line < self.rows && col < self.cols {
