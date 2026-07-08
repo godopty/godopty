@@ -89,8 +89,7 @@ godopty/
     └── scenes/
         ├── main.tscn
         ├── workspace.gd        # Root controller, layout, settings, sidebar
-        ├── terminal_pane.gd    # Primary terminal renderer (Control-based)
-        ├── terminal.gd         # Alternative terminal renderer (Node2D-based)
+        ├── terminal_pane.gd    # Terminal renderer (Control-based)
         └── focus_manager.gd    # Autoload: Alt+Arrow pane navigation
 ```
 
@@ -215,7 +214,7 @@ Self-reaction loops are prevented: a terminal ignores events where `source_pane 
 - [x] `godopty-gdext` crate (cdylib, gdext 0.5, Godot 4.7)
 - [x] `GodoptyTerminal` GodotClass: `start_shell()`, `send_input()`, `get_grid_rows()`
 - [x] Global tokio runtime (`LazyLock`) shared across all terminal nodes
-- [x] GDScript `terminal.gd`: `_draw()` renderer + `_input()` keyboard forwarding
+- [x] GDScript `terminal_pane.gd`: `_draw()` renderer + `_input()` keyboard forwarding
 - [x] Cell cache with dirty-check for efficient redraws
 - [x] Edge cases documented: double start, spawn failure, empty grid, lock contention
 
@@ -248,7 +247,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Code viewer pane** — Godot `CodeEdit` node for read-only file display
 - [ ] **Task ledger** — persistent to-do list per workspace
 - [ ] **Pane type registry** — unified interface for adding custom pane types
-- [ ] **Consolidate terminal renderers** — `terminal.gd` (Node2D) and `terminal_pane.gd` (Control) are ~85% duplicated; merge into a shared base class or delete the unused variant
+- [ ] ~~**Consolidate terminal renderers**~~ — removed unused `terminal.gd` (Node2D) variant; `terminal_pane.gd` (Control) is the sole renderer
 
 ### Terminal Engine
 - [ ] **Search** — Ctrl+F regex search across scrollback using alacritty_terminal

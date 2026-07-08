@@ -54,7 +54,6 @@ Key modules in `godopty-core`:
 |---|---|
 | `workspace.gd` | **Root controller**: tile grid, layout, sidebar, palette, global settings panel, keyboard shortcuts |
 | `terminal_pane.gd` | **Active renderer** (Control-based): inherits from Control, draws cells via `_draw()`, handles input, selection, scrollback |
-| `terminal.gd` | Alternative renderer (Node2D-based): similar to terminal_pane but older, less feature-complete |
 | `focus_manager.gd` | Autoload singleton: Alt+Arrow geographic pane navigation |
 | `main.tscn` | Scene entry point |
 
@@ -89,6 +88,6 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 ## Notes
 
 - The ESC key handler on the settings panel exists but `gui_input` never receives the event (see README roadmap).
-- `terminal_pane.gd` is the canonical renderer; `terminal.gd` is a legacy Node2D variant kept for reference.
+- `terminal_pane.gd` is the sole renderer (Control-based); the legacy Node2D `terminal.gd` was removed.
 - Font-size changes now auto-recalculate cell metrics via a setter on `font_size` — no need to recreate terminals.
 - The global tokio runtime is initialized once at GDExtension init and shared across all GodoptyTerminal nodes.
