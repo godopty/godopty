@@ -1,5 +1,4 @@
 extends Node
-class_name FocusManager
 # Focus Manager — autoload singleton for geographic pane navigation.
 # Listens for Alt+Arrow to jump to the nearest pane in that direction.
 
