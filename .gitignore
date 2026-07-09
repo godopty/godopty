@@ -40,4 +40,4 @@ reasonix.toml
 .reasonix/
 
 # Local audit (delete when resolved)
-TODO-AUDIT.md
+AUDIT.md
