@@ -271,6 +271,7 @@ func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Labe
 	var lbl = Label.new()
 	lbl.text = " " + (shell.get_file() if shell else "terminal")
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hbox.add_child(lbl)
 
 	for item in [
