@@ -685,13 +685,15 @@ func _add_file_picker(v: VBoxContainer, label: String, current_path: String, fil
 	v.add_child(h)
 
 func _apply_color_scheme(body: Control):
+	var term = body.get_node_or_null("GodoptyTerminal")
+	if not term: return
 	if _cfg_color_scheme_path == "" or not FileAccess.file_exists(_cfg_color_scheme_path):
-		body.set_palette("")
+		term.set_palette("")
 		return
 	var f = FileAccess.open(_cfg_color_scheme_path, FileAccess.READ)
 	if not f: return
 	var hex_csv = f.get_as_text().strip_edges().replace("\n", ",").replace(" ", "")
-	body.set_palette(hex_csv)
+	term.set_palette(hex_csv)
 
 func _add_scheme_picker(v: VBoxContainer):
 	_add_file_picker(v, "Color scheme:", _cfg_color_scheme_path, [["*.txt; *.json; *.csv", "Scheme files"]], func(path: String):

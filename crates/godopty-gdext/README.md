@@ -28,6 +28,7 @@ target/debug/libgodopty_gdext.so
 | `send_text(text: String)` | void | Send raw text to PTY (no newline) |
 | `send_line(text: String)` | void | Send a line to PTY (appends `\n`) |
 | `resize_grid(rows: int, cols: int)` | void | Resize grid + send SIGWINCH |
+| `set_palette(hex_csv: String)` | void | Load color scheme (16 hex colors, CSV) |
 | `get_grid_rows()` | `Array[Array[Dictionary]]` | Full renderable grid |
 | `get_grid_generation()` | `int` | Monotonic counter, changes on grid update |
 | `get_cursor_row()` | `int` | Cursor row (0-based, -1 if none) |

@@ -66,6 +66,7 @@ var _last_grid_gen: int = -1
 
 func _ready():
 	_terminal = GodoptyTerminal.new()
+	_terminal.name = "GodoptyTerminal"
 	add_child(_terminal)
 	_terminal.start_shell(shell_command, rows, cols)
 

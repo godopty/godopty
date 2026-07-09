@@ -84,7 +84,7 @@ impl GodoptyTerminal {
         let rows = rows.max(MIN_DIM) as usize;
         let cols = cols.max(MIN_DIM) as usize;
 
-        log::info!("[GDExt] Starting PTY {id}: {command} ({rows}×{cols})");
+        godot_print!("[GDExt] Starting PTY {id}: {command} ({rows}×{cols})");
 
         match RUNTIME.block_on(ENGINE.spawn_terminal_with_grid(
             config,
@@ -261,6 +261,7 @@ impl GodoptyTerminal {
         };
         if hex_csv.is_empty() {
             grid.palette = godopty_core::color::SYSTEM_COLORS;
+            grid.generation += 1;
             return;
         }
         let s = hex_csv.to_string();
@@ -273,6 +274,7 @@ impl GodoptyTerminal {
                     u8::from_str_radix(&h[5..7], 16),
                 ) {
                     grid.palette[i] = [r, g, b];
+            grid.generation += 1;
                 }
             }
         }
