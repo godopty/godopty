@@ -302,6 +302,7 @@ Features planned for future phases, roughly prioritized:
 - [x] ~~**Deduplicate engine spawn functions**~~ — extracted shared `run_terminal_task()` helper; `spawn_pty_terminal` and `spawn_terminal_with_grid` are now thin wrappers
 - [x] ~~**PtyHandle.resize wired to SIGWINCH**~~ — fully wired since P0 audit (35370dc); debounced in _on_resize()
 - [x] ~~**Configurable color palettes**~~ — added scheme file picker with sample solarized-dark; per-terminal runtime palette
+- [ ] **GPU-accelerated rendering** — rasterize grid to a single texture in Rust (fontdue), replace 1,920 per-frame draw calls with one draw_texture (~2.5× faster)
 
 ### Memory & Persistence
 - [ ] **SQLite + FTS5 history backend** — infinite scrollback with full-text search
