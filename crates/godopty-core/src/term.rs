@@ -316,6 +316,16 @@ mod tests {
     }
 
     #[test]
+    fn wide_character_flag() {
+        let mut g = TermGrid::new(5, 20);
+        // Feed a wide emoji character (Crab)
+        g.feed("🦀".as_bytes());
+        let rows = g.renderable_rows();
+        assert_eq!(rows[0][0].ch, '🦀');
+        assert!(rows[0][0].wide, "emoji cell should have the wide flag set");
+    }
+
+    #[test]
     fn feed_ansi_colors() {
         let mut g = TermGrid::new(5, 20);
         g.feed(b"\x1b[31mRED\x1b[0m\r\n");

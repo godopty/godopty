@@ -99,3 +99,28 @@ fn indexed_to_rgb(idx: u8, palette: &[[u8; 3]; 16]) -> [u8; 3] {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn indexed_boundaries() {
+        let palette = SYSTEM_COLORS;
+
+        // System colors
+        assert_eq!(indexed_to_rgb(0, &palette), palette[0]);
+        assert_eq!(indexed_to_rgb(15, &palette), palette[15]);
+
+        // 6x6x6 RGB cube boundaries
+        assert_eq!(indexed_to_rgb(16, &palette), [0, 0, 0]);
+        assert_eq!(indexed_to_rgb(231, &palette), [255, 255, 255]);
+
+        // Middle of cube (16 + 36*R + 6*G + B) -> R=1, G=2, B=3 -> 16 + 36 + 12 + 3 = 67
+        assert_eq!(indexed_to_rgb(67, &palette), [51, 102, 153]);
+
+        // Grayscale ramp boundaries
+        assert_eq!(indexed_to_rgb(232, &palette), [8, 8, 8]);
+        assert_eq!(indexed_to_rgb(255, &palette), [238, 238, 238]);
+    }
+}
