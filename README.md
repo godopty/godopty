@@ -265,7 +265,7 @@ Features planned for future phases, roughly prioritized:
 ### Polish
 - [ ] ~~**Configurable font selection**~~ — added font file picker with `_add_file_picker()` reusable helper
 - [ ] ~~**Title bar vertical centering**~~ — added `vertical_alignment = VERTICAL_ALIGNMENT_CENTER` to title label
-- [ ] **Notification/warning system** — toast messages for errors and limits
+- [ ] ~~**Notification/warning system**~~ — added `ToastManager` autoload with info/warn/error levels, queued display, and extensible data model
 - [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
 
 ### User Settings
