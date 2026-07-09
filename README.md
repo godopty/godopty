@@ -269,11 +269,11 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
 
 ### User Settings
-- [ ] ~~**Cursor blink speed**~~ — added `cursor_blink_speed` setting (0.1–2.0 s, persisted to settings.json)
-- [ ] ~~**Scroll wheel sensitivity**~~ — added `scroll_lines` setting (1–10, persisted to settings.json)
-- [ ] ~~**Default terminal dimensions**~~ — added `default_rows`/`default_cols` settings (10–100 × 40–200)
-- [ ] ~~**Cursor thickness**~~ — added `beam_width`/`underline_height` settings (1–8 px each)
-- [ ] ~~**UI theme colors**~~ — added 7 ColorPicker controls for wrapper, title bar, sidebar, focus, selection, and scrollback colors
+- [x] ~~**Cursor blink speed**~~ — added `cursor_blink_speed` setting (0.1–2.0 s, persisted to settings.json)
+- [x] ~~**Scroll wheel sensitivity**~~ — added `scroll_lines` setting (1–10, persisted to settings.json)
+- [x] ~~**Default terminal dimensions**~~ — added `default_rows`/`default_cols` settings (10–100 × 40–200)
+- [x] ~~**Cursor thickness**~~ — added `beam_width`/`underline_height` settings (1–8 px each)
+- [x] ~~**UI theme colors**~~ — added 7 ColorPicker controls for wrapper, title bar, sidebar, focus, selection, and scrollback colors
 
 ### Repository
 - [ ] **CONTRIBUTING.md** — setup instructions, PR process, and code style guide for contributors

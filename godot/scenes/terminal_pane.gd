@@ -32,7 +32,12 @@ const PRINTABLE_ASCII_MAX = 126
 		if _font != null:
 			_recompute_cell_metrics()
 
-@export var font_path: String = "res://fonts/DejaVuSansMono.ttf"
+@export var font_path: String = "res://fonts/DejaVuSansMono.ttf":
+	set(value):
+		font_path = value
+		if _font != null:
+			_reload_fonts()
+			_recompute_cell_metrics()
 @export var font_bold_path: String = "res://fonts/DejaVuSansMono-Bold.ttf"
 @export var font_italic_path: String = "res://fonts/DejaVuSansMono-Oblique.ttf"
 
@@ -86,6 +91,11 @@ func _notification(what):
 
 func _get_layout_state() -> Dictionary:
 	return {"shell": shell_command, "rows": rows, "cols": cols}
+
+func _reload_fonts():
+	_font = _load_font(font_path, "res://fonts/DejaVuSansMono.ttf")
+	_font_bold = _load_font(font_bold_path, "res://fonts/DejaVuSansMono-Bold.ttf")
+	_font_italic = _load_font(font_italic_path, "res://fonts/DejaVuSansMono-Oblique.ttf")
 
 func _load_font(path: String, fallback: String) -> Font:
 	var f: Font
