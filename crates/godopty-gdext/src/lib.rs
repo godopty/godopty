@@ -265,6 +265,7 @@ impl GodoptyTerminal {
             return;
         }
         let s = hex_csv.to_string();
+        let mut changed = false;
         for (i, hex) in s.split(',').enumerate().take(16) {
             let h = hex.trim();
             if h.len() == 7 && h.starts_with('#') {
@@ -274,9 +275,12 @@ impl GodoptyTerminal {
                     u8::from_str_radix(&h[5..7], 16),
                 ) {
                     grid.palette[i] = [r, g, b];
-            grid.generation += 1;
+                    changed = true;
                 }
             }
+        }
+        if changed {
+            grid.generation += 1;
         }
     }
 

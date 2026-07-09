@@ -48,6 +48,7 @@ impl LineParser {
 struct Handler {
     current_line: String,
     completed_lines: Vec<String>,
+    last_was_cr: bool,
 }
 
 impl Perform for Handler {
@@ -60,10 +61,14 @@ impl Perform for Handler {
     fn execute(&mut self, byte: u8) {
         match byte {
             // Line-feed: commit even if the line is empty (some programs
-            // output blank lines intentionally).
+            // output blank lines intentionally). Skip if preceded by CR
+            // to avoid spurious empty lines from \r\n pairs.
             b'\n' => {
-                self.completed_lines
-                    .push(std::mem::take(&mut self.current_line));
+                if !self.last_was_cr {
+                    self.completed_lines
+                        .push(std::mem::take(&mut self.current_line));
+                }
+                self.last_was_cr = false;
             }
             // Carriage-return: commit only if the line has content.
             // Some programs (e.g., progress bars) output status lines
@@ -73,9 +78,12 @@ impl Perform for Handler {
                 if !line.is_empty() {
                     self.completed_lines.push(line);
                 }
+                self.last_was_cr = true;
             }
-            // BEL, BS, HT, VT, FF — ignored.
-            _ => {}
+            // BEL, BS, HT, VT, FF — reset the CR flag and ignore.
+            _ => {
+                self.last_was_cr = false;
+            }
         }
     }
 
@@ -172,6 +180,12 @@ mod tests {
         let mut p = LineParser::new();
         let lines = p.feed(b"\n");
         assert_eq!(lines, vec![""]);
+    }
+    #[test]
+    fn crlf_produces_single_line() {
+        let mut p = LineParser::new();
+        let lines = p.feed(b"hello\r\nworld\r\n");
+        assert_eq!(lines, vec!["hello", "world"], "CRLF should not produce empty lines");
     }
 
     #[test]
