@@ -146,6 +146,13 @@ mod tests {
     }
 
     #[test]
+    fn cr_then_text_then_lf() {
+        let mut p = LineParser::new();
+        let lines = p.feed(b"hello\rworld\n");
+        assert_eq!(lines, vec!["hello", "world"]);
+    }
+
+    #[test]
     fn partial_then_complete() {
         let mut p = LineParser::new();
         let lines = p.feed(b"hel");
