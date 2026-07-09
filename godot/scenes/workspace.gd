@@ -24,6 +24,9 @@ const WRAPPER_BG_COLOR = Color(0.1, 0.1, 0.1, 1.0)
 const TITLE_BAR_BG_COLOR = Color(0.18, 0.18, 0.20, 1.0)
 const WRAPPER_BORDER_COLOR = Color(0.25, 0.25, 0.25, 0.6)
 const SIDEBAR_BG_COLOR = Color(0.12, 0.12, 0.15, 1.0)
+const FOCUS_BORDER_COLOR = Color(0.4, 0.7, 1.0, 0.3)
+const SELECTION_COLOR = Color(0.3, 0.5, 1.0, 0.4)
+const SCROLLBACK_INDICATOR_COLOR = Color.YELLOW
 
 # UI sizes
 const SETTINGS_PANEL_W = 320
@@ -626,7 +629,7 @@ func _add_dims_control(v: VBoxContainer) -> Array:
 	v.add_child(hr)
 	return [rspin, cspin]
 
-func _add_color_control(v: VBoxContainer, label: String, value: Color, setter: Callable) -> void:
+func _add_color_control(v: VBoxContainer, label: String, value: Color, setter: Callable) -> ColorPickerButton:
 	var h = HBoxContainer.new()
 	h.add_child(_lbl(label, 12))
 	var btn = ColorPickerButton.new()
@@ -635,6 +638,7 @@ func _add_color_control(v: VBoxContainer, label: String, value: Color, setter: C
 	btn.color_changed.connect(setter)
 	h.add_child(btn)
 	v.add_child(h)
+	return btn
 
 func _add_color_section(v: VBoxContainer) -> Array:
 	v.add_child(_lbl("UI Colors:", 13))
@@ -671,10 +675,10 @@ func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
 func _reset_colors(btns: Array):
 	var defaults = [WRAPPER_BG_COLOR, TITLE_BAR_BG_COLOR, WRAPPER_BORDER_COLOR, SIDEBAR_BG_COLOR, FOCUS_BORDER_COLOR, SELECTION_COLOR, SCROLLBACK_INDICATOR_COLOR]
 	for i in btns.size():
-		var picker = btns[i][1].get_child(0) if btns[i][1] is HBoxContainer else btns[i][1]
-		# btns[i] is [label, ColorPickerButton]
-		var ctrl = (btns[i][1] as ColorPickerButton)
-		ctrl.color = defaults[i]
+		if btns[i] is Array:
+			(btns[i][1] as ColorPickerButton).color = defaults[i]
+		else:
+			(btns[i] as ColorPickerButton).color = defaults[i]
 
 func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, cursor_px: Array, color_btns: Array, fs_spin: SpinBox):
 	var btn = Button.new(); btn.text = "Reset to defaults"
