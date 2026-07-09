@@ -300,7 +300,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Damage tracking** — only redraw changed grid lines (optimization)
 - [x] ~~**Optimize grid data transfer**~~ — replaced per-cell Dictionary format with flat packed arrays (chars/fg/bg/attrs); generation counter skips idle frames
 - [x] ~~**Deduplicate engine spawn functions**~~ — extracted shared `run_terminal_task()` helper; `spawn_pty_terminal` and `spawn_terminal_with_grid` are now thin wrappers
-- [ ] **PtyHandle.resize wired to SIGWINCH** — shell reflows on pane resize
+- [x] ~~**PtyHandle.resize wired to SIGWINCH**~~ — fully wired since P0 audit (35370dc); debounced in _on_resize()
 - [x] ~~**Configurable color palettes**~~ — added scheme file picker with sample solarized-dark; per-terminal runtime palette
 
 ### Memory & Persistence
