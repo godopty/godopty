@@ -263,7 +263,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Concept persistence** — saved regex triggers survive restarts
 
 ### Polish
-- [ ] **Configurable font selection** — user-provided .ttf path in settings
+- [ ] ~~**Configurable font selection**~~ — added font file picker with `_add_file_picker()` reusable helper
 - [ ] **Title bar vertical centering** — font baseline alignment fix
 - [ ] **Notification/warning system** — toast messages for errors and limits
 - [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
