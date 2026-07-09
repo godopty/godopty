@@ -187,6 +187,7 @@ Concept {
 Self-reaction loops are prevented: a terminal ignores events where `source_pane == my_id`.
 
 ---
+> **⚠️ Security Warning:** The Concept Engine is designed to execute commands automatically based on terminal output. Do not bind destructive or high-privilege actions (like `rm` or `sudo`) to easily spoofable regex triggers. An attacker could intentionally print matching text to trick your terminal into executing the action payload.
 
 ## Implementation Phases
 
@@ -275,6 +276,12 @@ Features planned for future phases, roughly prioritized:
 - [ ] **SQLite + FTS5 history backend** — infinite scrollback with full-text search
 - [ ] **Session auto-save** — restore all PTY sessions on relaunch
 - [ ] **Concept persistence** — saved regex triggers survive restarts
+
+### Security
+- [ ] **Workspace Trust** — warn the user before spawning a PTY if a loaded `layout.json` sets `shell_command` to anything other than a standard system shell (e.g., `/bin/bash`). Protects against "Malicious Workspace" layout files executing arbitrary code.
+- [ ] **UI Thread DoS Mitigation** — implement a frame-rate cap on grid synchronization to prevent a flooded PTY (e.g., `cat /dev/urandom`) from spamming GDScript's `_draw` cycle and freezing the Godot main thread.
+- [ ] **Godot Export Security** — ensure production Godot export templates strictly disable debugging and console output to prevent leaking internal node trees.
+- [ ] **FFI Fuzz Testing** — implement Rust tests pumping garbage binary data into `TermGrid::feed()` to ensure `alacritty_terminal` and `LineParser` handle panics safely without crashing the Godot runtime.
 
 ### Repository
 - [ ] **CONTRIBUTING.md** — setup instructions, PR process, and code style guide for contributors
