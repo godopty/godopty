@@ -6,37 +6,37 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Godot 4.3+ Frontend (Phase 2–3)                            │
-│  ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌───────────────┐    │
-│  │ Terminal │ │ Terminal │ │ File-Tree │ │ Task Ledger   │    │
-│  │  Pane   │ │  Pane   │ │  Viewer   │ │               │    │
-│  └────┬────┘ └────┬────┘ └──────────┘ └───────────────┘    │
-│       │           │                                         │
-│  ┌────┴───────────┴────────────────────────────────────┐    │
-│  │  Nested SplitContainer + Drag-and-Drop              │    │
-│  └─────────────────────────┬───────────────────────────┘    │
+│  Godot 4.3+ Frontend                                        │
+│  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌───────────────┐  │
+│  │ Terminal │ │ Terminal │ │ File-Tree │ │ Task Ledger   │  │
+│  │  Pane    │ │  Pane    │ │  Viewer   │ │               │  │
+│  └────┬─────┘ └────┬─────┘ └───────────┘ └───────────────┘  │
+│       │            │                                        │
+│  ┌────┴────────────┴─────────────────────────────────────┐  │
+│  │  Nested SplitContainer + Drag-and-Drop                │  │
+│  └─────────────────────────┬─────────────────────────────┘  │
 │                            │                                │
-│  ┌─────────────────────────┴───────────────────────────┐    │
-│  │  gdext Bridge (rust → Godot character grid arrays)   │    │
-│  └─────────────────────────┬───────────────────────────┘    │
+│  ┌─────────────────────────┴─────────────────────────────┐  │
+│  │  gdext Bridge (rust → Godot character grid arrays)    │  │
+│  └─────────────────────────┬─────────────────────────────┘  │
 └────────────────────────────┼────────────────────────────────┘
                              │
 ┌────────────────────────────┼────────────────────────────────┐
-│  Rust Backend (godopty-core)                                 │
-│  ┌─────────────────────────┴───────────────────────────┐    │
-│  │  WorkspaceEngine — tokio::sync::broadcast pub-sub    │    │
-│  │  Concept registry (regex triggers → labelled actions) │    │
-│  └──────────┬──────────────────────┬───────────────────┘    │
+│  Rust Backend (godopty-core)                                │
+│  ┌─────────────────────────┴─────────────────────────────┐  │
+│  │  WorkspaceEngine — tokio::sync::broadcast pub-sub     │  │
+│  │  Concept registry (regex triggers → labelled actions) │  │
+│  └──────────┬──────────────────────┬─────────────────────┘  │
 │             │                      │                        │
-│  ┌──────────┴──────────┐  ┌───────┴───────────────────┐    │
-│  │  pty.rs              │  │  parser.rs                │    │
-│  │  portable-pty spawn  │  │  vte ANSI state machine   │    │
-│  │  dedicated I/O thread│  │  extracts visible lines   │    │
-│  │  cross-platform      │  │                            │    │
-│  └──────────────────────┘  └────────────────────────────┘    │
-│                                                              │
-│  Future: SQLite + FTS5 memory backend                        │
-└──────────────────────────────────────────────────────────────┘
+│  ┌──────────┴───────────┐  ┌───────┴─────────────────────┐  │
+│  │  pty.rs              │  │  parser.rs                  │  │
+│  │  portable-pty spawn  │  │  vte ANSI state machine     │  │
+│  │  dedicated I/O thread│  │  extracts visible lines     │  │
+│  │  cross-platform      │  │                             │  │
+│  └──────────────────────┘  └─────────────────────────────┘  │
+│                                                             │
+│  Future: SQLite + FTS5 memory backend                       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Design Decisions
@@ -268,7 +268,7 @@ Features planned for future phases, roughly prioritized:
 - [x] ~~**Optimize grid data transfer**~~ — added `generation` counter to TermGrid; GDScript skips `get_grid_rows()` when unchanged, avoiding per-frame Dictionary allocations
 - [x] ~~**Deduplicate engine spawn functions**~~ — extracted shared `run_terminal_task()` helper; `spawn_pty_terminal` and `spawn_terminal_with_grid` are now thin wrappers
 - [ ] **PtyHandle.resize wired to SIGWINCH** — shell reflows on pane resize
-- [ ] **Configurable color palettes** — load xterm color schemes
+- [x] ~~**Configurable color palettes**~~ — added scheme file picker with sample solarized-dark; per-terminal runtime palette
 
 ### Memory & Persistence
 - [ ] **SQLite + FTS5 history backend** — infinite scrollback with full-text search
