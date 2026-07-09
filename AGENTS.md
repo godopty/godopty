@@ -90,6 +90,7 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 - Scopes: `settings`, `terminal`, `layout`, `sidebar`, `gdext`, `core`, `cli`
 
 ### Pitfalls
+- **vte `Perform::execute` CR/LF**: PTY output uses CRLF pairs. The vte parser calls `execute` per byte. If you commit on both `\r` and `\n`, every line produces a spurious empty string. Track `last_was_cr` and skip the `\n` commit when preceded by `\r`.
 - **`alacritty_terminal` display_iter**: returns **negative** line numbers for scrollback history rows. Never cast directly to `usize` — it wraps to a huge value. Always add the grid's `display_offset()` to normalize: `let line = (indexed.point.line.0 + offset) as usize`.
 - **Godot typed Arrays**: `Array[T]` won't accept plain `Array`. If you type a parameter, check all call sites use matching types (`var x: Array[Control] = []`).
 - **GDExtension rebuilds**: After changing `#[func]` signatures or adding methods, rebuild with `cargo build -p godopty-gdext` and restart Godot.
