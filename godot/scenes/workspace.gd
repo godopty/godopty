@@ -24,9 +24,6 @@ const WRAPPER_BG_COLOR = Color(0.1, 0.1, 0.1, 1.0)
 const TITLE_BAR_BG_COLOR = Color(0.18, 0.18, 0.20, 1.0)
 const WRAPPER_BORDER_COLOR = Color(0.25, 0.25, 0.25, 0.6)
 const SIDEBAR_BG_COLOR = Color(0.12, 0.12, 0.15, 1.0)
-const FOCUS_BORDER_COLOR = Color(0.4, 0.7, 1.0, 0.3)
-const SELECTION_COLOR = Color(0.3, 0.5, 1.0, 0.4)
-const SCROLLBACK_INDICATOR_COLOR = Color.YELLOW
 
 # UI sizes
 const SETTINGS_PANEL_W = 320
@@ -61,9 +58,9 @@ var _cfg_wrapper_bg := WRAPPER_BG_COLOR
 var _cfg_title_bar_bg := TITLE_BAR_BG_COLOR
 var _cfg_wrapper_border := WRAPPER_BORDER_COLOR
 var _cfg_sidebar_bg := SIDEBAR_BG_COLOR
-var _cfg_focus_border := FOCUS_BORDER_COLOR
-var _cfg_selection := SELECTION_COLOR
-var _cfg_scrollback_indicator := SCROLLBACK_INDICATOR_COLOR
+var _cfg_focus_border := TerminalPane.FOCUS_BORDER_COLOR
+var _cfg_selection := TerminalPane.SELECTION_COLOR
+var _cfg_scrollback_indicator := TerminalPane.SCROLLBACK_INDICATOR_COLOR
 var _cfg_font_size := 14
 
 var _sidebar: Control
@@ -474,9 +471,9 @@ func _load_settings():
 		_cfg_title_bar_bg = _color_from_hex(d.get("title_bar_bg", ""), TITLE_BAR_BG_COLOR)
 		_cfg_wrapper_border = _color_from_hex(d.get("wrapper_border", ""), WRAPPER_BORDER_COLOR)
 		_cfg_sidebar_bg = _color_from_hex(d.get("sidebar_bg", ""), SIDEBAR_BG_COLOR)
-		_cfg_focus_border = _color_from_hex(d.get("focus_border", ""), FOCUS_BORDER_COLOR)
-		_cfg_selection = _color_from_hex(d.get("selection", ""), SELECTION_COLOR)
-		_cfg_scrollback_indicator = _color_from_hex(d.get("scrollback_indicator", ""), SCROLLBACK_INDICATOR_COLOR)
+		_cfg_focus_border = _color_from_hex(d.get("focus_border", ""), TerminalPane.FOCUS_BORDER_COLOR)
+		_cfg_selection = _color_from_hex(d.get("selection", ""), TerminalPane.SELECTION_COLOR)
+		_cfg_scrollback_indicator = _color_from_hex(d.get("scrollback_indicator", ""), TerminalPane.SCROLLBACK_INDICATOR_COLOR)
 		_cfg_font_size = d.get("font_size", 14)
 
 func _save_settings():
@@ -673,7 +670,7 @@ func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
 	return [bspin, uspin]
 
 func _reset_colors(btns: Array):
-	var defaults = [WRAPPER_BG_COLOR, TITLE_BAR_BG_COLOR, WRAPPER_BORDER_COLOR, SIDEBAR_BG_COLOR, FOCUS_BORDER_COLOR, SELECTION_COLOR, SCROLLBACK_INDICATOR_COLOR]
+	var defaults = [WRAPPER_BG_COLOR, TITLE_BAR_BG_COLOR, WRAPPER_BORDER_COLOR, SIDEBAR_BG_COLOR, TerminalPane.FOCUS_BORDER_COLOR, TerminalPane.SELECTION_COLOR, TerminalPane.SCROLLBACK_INDICATOR_COLOR]
 	for i in btns.size():
 		if btns[i] is Array:
 			(btns[i][1] as ColorPickerButton).color = defaults[i]
@@ -695,9 +692,9 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		_cfg_title_bar_bg = TITLE_BAR_BG_COLOR
 		_cfg_wrapper_border = WRAPPER_BORDER_COLOR
 		_cfg_sidebar_bg = SIDEBAR_BG_COLOR
-		_cfg_focus_border = FOCUS_BORDER_COLOR
-		_cfg_selection = SELECTION_COLOR
-		_cfg_scrollback_indicator = SCROLLBACK_INDICATOR_COLOR
+		_cfg_focus_border = TerminalPane.FOCUS_BORDER_COLOR
+		_cfg_selection = TerminalPane.SELECTION_COLOR
+		_cfg_scrollback_indicator = TerminalPane.SCROLLBACK_INDICATOR_COLOR
 		_cfg_font_size = 14
 		_save_settings()
 		shape_opt.selected = 0
