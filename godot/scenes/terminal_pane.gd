@@ -53,7 +53,7 @@ var _terminal: GodoptyTerminal
 var _font: Font
 var _font_bold: Font
 var _font_italic: Font
-var _cell_cache: Array = []  # Array of Array[Dictionary] from gdext (untyped bridge)
+var _cell_cache: Dictionary = {}
 var _cell_w: float = 0.0
 var _cell_h: float = 0.0
 var _cursor_blink_timer: float = 0.0
@@ -125,7 +125,7 @@ func _process(delta):
 	var gen = _terminal.get_grid_generation()
 	if gen != _last_grid_gen:
 		_last_grid_gen = gen
-		_cell_cache = _terminal.get_grid_rows()
+		_cell_cache = _terminal.get_grid_packed()
 		_cursor_visible = true
 		_cursor_blink_timer = 0.0
 	queue_redraw()
@@ -135,13 +135,13 @@ func _process(delta):
 		_last_title = t; title_changed.emit(t)
 
 func _grid_offset() -> Vector2:
-	var gc = _cell_cache[0].size() if _cell_cache.size() > 0 else 1
-	var gr = _cell_cache.size()
+	var gc: int = _cell_cache["cols"]
+	var gr: int = _cell_cache["rows"]
 	var tw = gc * _cell_w; var th = gr * _cell_h
 	return Vector2(2 + maxf((size.x - PADDING - tw) / 2.0, 0), 2 + maxf((size.y - PADDING - th) / 2.0, 0))
 
 func _draw():
-	if _cell_cache.is_empty(): return
+	if _cell_cache.is_empty() or _cell_cache.get("rows", 0) == 0: return
 
 	var off = _grid_offset()
 	var baseline = _font.get_ascent(font_size)
@@ -169,39 +169,45 @@ func _draw():
 		_draw_selection(off)
 
 func _draw_cells(off: Vector2, baseline: float):
-	for r in _cell_cache.size():
-		var row: Array = _cell_cache[r]
-		var skip_next = false
-		for c in row.size():
+	var grid: Dictionary = _cell_cache
+	if grid.is_empty(): return
+	var n_rows: int = grid["rows"]; var n_cols: int = grid["cols"]
+	var chars: Array = grid["chars"]
+	var fg_arr: Array = grid["fg"]; var bg_arr: Array = grid["bg"]
+	var attrs: Array = grid["attrs"]
+	var skip_next = false
+	for r in n_rows:
+		for c in n_cols:
 			if skip_next:
 				skip_next = false
 				continue
-			var cell: Dictionary = row[c]
-			if cell.get("wide", false): skip_next = true
-			var x = off.x + c * _cell_w; var y = off.y + r * _cell_h
-			var fg = cell["fg"] as Color; var bg = cell["bg"] as Color
-			if cell.get("inverse", false): var tmp = fg; fg = bg; bg = tmp
+			var idx = r * cols + c
+			var ch: String = chars[r][c]
+			var fg = fg_arr[idx] as Color
+			var bg = bg_arr[idx] as Color
+			var a: int = attrs[idx]
+			if a & 16 != 0: skip_next = true
+			if a & 8 != 0: var tmp = fg; fg = bg; bg = tmp
 
-			draw_rect(Rect2(x, y, _cell_w, _cell_h), bg)
+			draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), bg)
 
-			var ch: String = cell["ch"]
 			if ch != " " and ch != "":
 				var uf = _font
-				if cell.get("bold", false): uf = _font_bold
-				if cell.get("italic", false): uf = _font_italic
-				draw_string(uf, Vector2(x, y + baseline), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, fg)
+				if a & 1 != 0: uf = _font_bold
+				if a & 2 != 0: uf = _font_italic
+				draw_string(uf, Vector2(off.x + c * _cell_w, off.y + r * _cell_h + baseline), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, fg)
 
-			if cell.get("underline", false):
-				draw_line(Vector2(x, y + baseline + 2), Vector2(x + _cell_w, y + baseline + 2), fg, 1.0)
+			if a & 4 != 0:
+				draw_line(Vector2(off.x + c * _cell_w, off.y + r * _cell_h + baseline + 2), Vector2(off.x + (c + 1) * _cell_w, off.y + r * _cell_h + baseline + 2), fg, 1.0)
 
 func _draw_cursor(off: Vector2, baseline: float):
 	var cr = _terminal.get_cursor_row(); var cc = _terminal.get_cursor_col()
 	if cr < 0 or cc < 0: return
 	var cx = off.x + cc * _cell_w; var cy = off.y + cr * _cell_h
 	var cursor_ch = ""
-	if cr < _cell_cache.size():
-		var rw: Array = _cell_cache[cr]
-		if cc < rw.size(): cursor_ch = rw[cc]["ch"]
+	if cr < _cell_cache.get("rows", 0) and cc < _cell_cache.get("cols", 0):
+		var chars: Array = _cell_cache["chars"]
+		cursor_ch = chars[cr][cc]
 
 	match cursor_shape:
 		0:
@@ -223,11 +229,12 @@ func _draw_selection(off: Vector2):
 		p0 = _sel_end; p1 = _sel_start
 	var sr0 = p0.y; var sr1 = p1.y
 	for r in range(sr0, sr1 + 1):
-		if r < 0 or r >= _cell_cache.size(): continue
+		var gcols: int = _cell_cache["cols"]; var grows: int = _cell_cache["rows"]
+		if r < 0 or r >= grows: continue
 		var cb = p0.x if r == sr0 else 0
-		var ce = (p1.x if r == sr1 else cols - 1) + 1
+		var ce = (p1.x if r == sr1 else gcols - 1) + 1
 		for c in range(cb, ce):
-			if c >= 0 and c < cols:
+			if c >= 0 and c < gcols:
 				draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), selection_color)
 
 
@@ -239,13 +246,14 @@ func _get_selected_text() -> String:
 	var sr0 = p0.y; var sr1 = p1.y
 	var lines: Array[String] = []
 	for r in range(sr0, sr1 + 1):
-		if r < 0 or r >= _cell_cache.size(): continue
-		var row: Array = _cell_cache[r]
+		var gcols: int = _cell_cache["cols"]; var grows: int = _cell_cache["rows"]
+		if r < 0 or r >= grows: continue
+		var chars: Array = _cell_cache["chars"]
 		var cb = maxi(0, p0.x if r == sr0 else 0)
-		var ce = mini(row.size() - 1, p1.x if r == sr1 else cols - 1)
+		var ce = mini(gcols - 1, p1.x if r == sr1 else gcols - 1)
 		var line = ""
 		for c in range(cb, ce + 1):
-			line += row[c]["ch"]
+			line += chars[r][c]
 		lines.append(line.rstrip(" "))
 	return "\n".join(lines)
 

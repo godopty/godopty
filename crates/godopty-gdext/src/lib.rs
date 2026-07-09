@@ -311,6 +311,40 @@ impl GodoptyTerminal {
 
     /// Convert a `CellInfo` into a Godot `Dictionary` with keys:
     /// `ch`, `fg`, `bg`, `bold`, `italic`, `underline`, `inverse`.
+    /// Return the grid as flat parallel arrays (no per-cell Dictionary overhead).
+    /// Returns a Dictionary: rows, cols, chars (String per row), fg/bg (Color array), attrs (int array).
+    #[func]
+    fn get_grid_packed(&self) -> Dictionary<Variant, Variant> {
+        self.with_grid(
+            |g| {
+                let rows = g.renderable_rows();
+                let n_rows = rows.len();
+                let n_cols = if n_rows > 0 { rows[0].len() } else { 0 };
+                let mut chars: Array<Variant> = Array::new();
+                let mut fg: Array<Variant> = Array::new();
+                let mut bg: Array<Variant> = Array::new();
+                let mut attrs: Array<Variant> = Array::new();
+                for row in rows.iter() {
+                    let mut line = String::with_capacity(n_cols);
+                    for cell in row.iter() {
+                        line.push(cell.ch);
+                        fg.push(&Variant::from(Color::from_rgb(cell.fg[0] as f32 * RGB_SCALE, cell.fg[1] as f32 * RGB_SCALE, cell.fg[2] as f32 * RGB_SCALE)));
+                        bg.push(&Variant::from(Color::from_rgb(cell.bg[0] as f32 * RGB_SCALE, cell.bg[1] as f32 * RGB_SCALE, cell.bg[2] as f32 * RGB_SCALE)));
+                        let mut a: i64 = 0;
+                        if cell.bold { a |= 1; } if cell.italic { a |= 2; } if cell.underline { a |= 4; } if cell.inverse { a |= 8; } if cell.wide { a |= 16; }
+                        attrs.push(&Variant::from(a));
+                    }
+                    chars.push(&Variant::from(line));
+                }
+                let mut dict = Dictionary::<Variant, Variant>::new();
+                dict.set("rows", &Variant::from(n_rows as i64)); dict.set("cols", &Variant::from(n_cols as i64));
+                dict.set("chars", &Variant::from(chars)); dict.set("fg", &Variant::from(fg));
+                dict.set("bg", &Variant::from(bg)); dict.set("attrs", &Variant::from(attrs));
+                dict
+            }, Dictionary::<Variant, Variant>::new(),
+        )
+    }
+
     fn cell_to_dict(cell: &godopty_core::term::CellInfo) -> Dictionary<Variant, Variant> {
         let mut dict = Dictionary::<Variant, Variant>::new();
         dict.set("ch", &Variant::from(cell.ch.to_string()));
