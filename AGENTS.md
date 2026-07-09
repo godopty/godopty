@@ -74,12 +74,16 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 - **Settings pipeline**: `_cfg_*` → `_save_settings()` → `user://settings.json`. To add a new setting: (1) add `_cfg_` var, (2) add UI control, (3) add one line to `_apply_settings_to()`. `_build_wrapper()` calls it automatically — no other wiring needed.
 - **Layout persistence**: `user://layout.json`
 - **Terminal spawning**: `_build_wrapper()` is the sole entry point; all paths go through it
+- **Layout Constraints**: The tiling grid relies on Godot `Control` nodes. Prefer using Godot's built-in Size Flags (Expand/Fill) inside containers (`HBoxContainer`/`VBoxContainer`) over manual pixel math. When manual math is absolutely required (like terminal cell reflows), hook into `_notification(NOTIFICATION_RESIZED)`.
+- **Pub-Sub Bridge**: To handle `WorkspaceEngine` events (like regex concept triggers) in Godot, GDScript must poll the Rust backend in `_process()` or rely on Rust calling `call_deferred("emit_signal", ...)`.
 
 ### Rust
 - **Edition**: 2024 (requires Rust ≥ 1.85)
 - **Format**: standard `rustfmt`
 - **Async runtime**: `tokio` (global `LazyLock` runtime in gdext)
 - **Grid sharing**: `Arc<Mutex<TermGrid>>` — lock briefly, clone the grid, release
+- **Thread Safety**: Godot's SceneTree is strictly single-threaded. NEVER call Godot methods, mutate nodes, or emit signals directly from background `tokio` threads. Instead, queue the state changes for GDScript to poll, or use Godot's thread-safe `call_deferred()`.
+- **Lifecycle & Teardown**: When a `GodoptyTerminal` is destroyed (e.g., `queue_free()` in Godot), the Rust side MUST ensure the spawned shell and background `tokio` tasks are cleanly terminated (via the `Drop` trait) to prevent zombie processes or memory leaks.
 
 ### Commits
 - **Format**: [Conventional Commits](https://www.conventionalcommits.org/) — `feat(scope):`, `fix(scope):`, `chore(scope):`
