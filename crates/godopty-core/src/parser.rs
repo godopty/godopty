@@ -55,6 +55,7 @@ impl Perform for Handler {
     /// Printable character — append to current line.
     fn print(&mut self, c: char) {
         self.current_line.push(c);
+        self.last_was_cr = false;
     }
 
     /// C0 control character.
