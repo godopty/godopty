@@ -363,8 +363,14 @@ func _add_sidebar_fps(v: VBoxContainer):
 	v.add_child(_fps_label)
 
 func _process(delta):
-	if _fps_label and Engine.get_process_frames() % 10 == 0:
-		_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
+	if _fps_label and Engine.get_process_frames() % 6 == 0:
+		var fps = Engine.get_frames_per_second()
+		var txt = "FPS: %d" % fps
+		if _last_body and _last_body.get_script() == preload("res://scenes/terminal_pane.gd"):
+			txt += "
+Fetch: %dms
+Draw: %dms" % [_last_body._fetch_ms, _last_body._draw_ms]
+		_fps_label.text = txt
 
 func _add_sidebar_header(v: VBoxContainer):
 	var h = HBoxContainer.new(); h.name = "Header"

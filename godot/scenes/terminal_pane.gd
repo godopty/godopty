@@ -64,6 +64,8 @@ var _selecting: bool = false
 var _sel_start: Vector2i = Vector2i(-1, -1)
 var _sel_end: Vector2i = Vector2i(-1, -1)
 var _last_grid_gen: int = -1
+var _fetch_ms: int = 0
+var _draw_ms: int = 0
 
 func _ready():
 	_terminal = GodoptyTerminal.new()
@@ -140,10 +142,13 @@ func _process(delta):
 	var gen = _terminal.get_grid_generation()
 	if gen != _last_grid_gen:
 		_last_grid_gen = gen
+		var t0 = Time.get_ticks_msec()
 		_cell_cache = _terminal.get_grid_packed()
+		_fetch_ms = Time.get_ticks_msec() - t0
 		_cursor_visible = true
 		_cursor_blink_timer = 0.0
 	queue_redraw()
+	_draw_ms = 0  # will be set on next _draw() call
 
 	var t = _terminal.get_title()
 	if t != _last_title and t != "":
@@ -156,7 +161,10 @@ func _grid_offset() -> Vector2:
 	return Vector2(2 + maxf((size.x - PADDING - tw) / 2.0, 0), 2 + maxf((size.y - PADDING - th) / 2.0, 0))
 
 func _draw():
-	if _cell_cache.is_empty() or _cell_cache.get("rows", 0) == 0: return
+	var t0 = Time.get_ticks_msec()
+	if _cell_cache.is_empty() or _cell_cache.get("rows", 0) == 0:
+		_draw_ms = Time.get_ticks_msec() - t0
+		return
 
 	var off = _grid_offset()
 	var baseline = _font.get_ascent(font_size)
@@ -182,6 +190,7 @@ func _draw():
 	# Selection
 	if _sel_start.x >= 0 and _sel_end.x >= 0:
 		_draw_selection(off)
+	_draw_ms = Time.get_ticks_msec() - t0
 
 func _draw_cells(off: Vector2, baseline: float):
 	var grid: Dictionary = _cell_cache
