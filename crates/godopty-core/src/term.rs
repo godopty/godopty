@@ -98,6 +98,8 @@ pub struct TermGrid {
     /// Incremented on every feed() and resize(); used by Godot to
     /// skip redundant grid fetches when nothing changed.
     pub generation: u64,
+    /// Current 16-color palette (ANSI 0-15). Defaults to standard xterm colors.
+    pub palette: [[u8; 3]; 16],
 }
 
 impl TermGrid {
@@ -113,7 +115,7 @@ impl TermGrid {
         let term = Term::new(config, &size, listener);
         let processor = vte::ansi::Processor::new();
 
-        Self { term, processor, title, rows, cols, generation: 0 }
+        Self { term, processor, title, rows, cols, generation: 0, palette: crate::color::SYSTEM_COLORS }
     }
 
     /// Feed raw PTY output bytes into the terminal state machine.
@@ -146,7 +148,7 @@ impl TermGrid {
             let col = indexed.point.column.0 as usize;
 
             if line < self.rows && col < self.cols {
-                rows[line][col] = CellInfo::from_cell(indexed.cell);
+                rows[line][col] = CellInfo::from_cell(indexed.cell, &self.palette);
             }
         }
 
@@ -272,12 +274,12 @@ impl CellInfo {
     /// Named colors (like "Background", "Foreground", "Red") are resolved
     /// to their approximate RGB values. True-color ANSI sequences
     /// (`\x1b[38;2;R;G;Bm`) are handled natively by `vte::ansi::Rgb`.
-    fn from_cell(cell: &Cell) -> Self {
+    pub fn from_cell(cell: &Cell, palette: &[[u8; 3]; 16]) -> Self {
         let flags = cell.flags;
         Self {
             ch: cell.c,
-            fg: color_to_rgb(&cell.fg),
-            bg: color_to_rgb(&cell.bg),
+            fg: color_to_rgb(&cell.fg, palette),
+            bg: color_to_rgb(&cell.bg, palette),
             bold: flags.contains(Flags::BOLD),
             italic: flags.contains(Flags::ITALIC),
             underline: flags.contains(Flags::UNDERLINE),
