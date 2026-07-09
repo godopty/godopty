@@ -284,33 +284,6 @@ impl GodoptyTerminal {
         }
     }
 
-    /// Return all rows as `Array[Array[Dictionary]]`.
-    ///
-    /// Each dictionary has keys: `"ch"` (String), `"fg"` (Color), `"bg"` (Color).
-    /// Empty cells are `"ch": " "` with default terminal colors.
-    ///
-    /// # Edge cases
-    /// - Returns `[]` if no shell started or grid lock is momentarily held.
-    #[func]
-    fn get_grid_rows(&self) -> Array<Variant> {
-        self.with_grid(
-            |g| {
-                let mut result = Array::<Variant>::new();
-                for row in g.renderable_rows() {
-                    let mut row_arr = Array::<Variant>::new();
-                    for cell in row {
-                        row_arr.push(&Self::cell_to_dict(&cell));
-                    }
-                    result.push(&row_arr);
-                }
-                result
-            },
-            Array::<Variant>::new(),
-        )
-    }
-
-    /// Convert a `CellInfo` into a Godot `Dictionary` with keys:
-    /// `ch`, `fg`, `bg`, `bold`, `italic`, `underline`, `inverse`.
     /// Return the grid as flat parallel arrays (no per-cell Dictionary overhead).
     /// Returns a Dictionary: rows, cols, chars (String per row), fg/bg (Color array), attrs (int array).
     #[func]
@@ -345,32 +318,6 @@ impl GodoptyTerminal {
         )
     }
 
-    fn cell_to_dict(cell: &godopty_core::term::CellInfo) -> Dictionary<Variant, Variant> {
-        let mut dict = Dictionary::<Variant, Variant>::new();
-        dict.set("ch", &Variant::from(cell.ch.to_string()));
-        dict.set(
-            "fg",
-            &Variant::from(Color::from_rgb(
-                cell.fg[0] as f32 * RGB_SCALE,
-                cell.fg[1] as f32 * RGB_SCALE,
-                cell.fg[2] as f32 * RGB_SCALE,
-            )),
-        );
-        dict.set(
-            "bg",
-            &Variant::from(Color::from_rgb(
-                cell.bg[0] as f32 * RGB_SCALE,
-                cell.bg[1] as f32 * RGB_SCALE,
-                cell.bg[2] as f32 * RGB_SCALE,
-            )),
-        );
-        dict.set("bold", &Variant::from(cell.bold));
-        dict.set("italic", &Variant::from(cell.italic));
-        dict.set("underline", &Variant::from(cell.underline));
-        dict.set("inverse", &Variant::from(cell.inverse));
-        dict.set("wide", &Variant::from(cell.wide));
-        dict
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
