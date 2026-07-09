@@ -218,6 +218,19 @@ Self-reaction loops are prevented: a terminal ignores events where `source_pane 
 - [x] Cell cache with dirty-check for efficient redraws
 - [x] Edge cases documented: double start, spawn failure, empty grid, lock contention
 
+### ✅ Phase 2c — User Experience & Customization (COMPLETE)
+
+- [x] Configurable cursor blink speed (0.1–2.0 s)
+- [x] Configurable scroll wheel sensitivity (1–10 lines)
+- [x] Configurable default terminal dimensions (10–100 × 40–200)
+- [x] Configurable cursor thickness (beam width 1–8 px, underline height 1–8 px)
+- [x] Configurable UI theme colors (7 ColorPicker controls)
+- [x] Configurable font selection (file picker with `_add_file_picker()` reusable helper)
+- [x] Title bar vertical centering (label + right-aligned buttons with toggle arrows)
+- [x] Global settings panel with instant-apply, debounce, and Reset-to-defaults
+- [x] Settings persistence (auto-save/load to `user://settings.json`)
+- [x] Toast notification system (`ToastManager` autoload, replace-on-new, 3 levels)
+
 ### 🔜 Phase 3 — Spatial Layout & SQLite
 
 - [ ] Nested `SplitContainer` logic
@@ -241,6 +254,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Tab/workspace switching** — multiple named workspaces per session
 - [ ] **ESC to dismiss settings panel** — `gui_input` on the settings panel background is not receiving key events; the ESC handler is wired but never fires
 - [ ] **Title bar right-click menu** — split/close/move options
+- [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
 
 ### Pane Types
 - [ ] **File tree viewer** — Godot `Tree` node populated via `DirAccess` API
@@ -261,19 +275,6 @@ Features planned for future phases, roughly prioritized:
 - [ ] **SQLite + FTS5 history backend** — infinite scrollback with full-text search
 - [ ] **Session auto-save** — restore all PTY sessions on relaunch
 - [ ] **Concept persistence** — saved regex triggers survive restarts
-
-### Polish
-- [ ] ~~**Configurable font selection**~~ — added font file picker with `_add_file_picker()` reusable helper
-- [ ] ~~**Title bar vertical centering**~~ — added `vertical_alignment = VERTICAL_ALIGNMENT_CENTER` to title label
-- [ ] ~~**Notification/warning system**~~ — added `ToastManager` autoload with info/warn/error levels, queued display, and extensible data model
-- [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
-
-### User Settings
-- [x] ~~**Cursor blink speed**~~ — added `cursor_blink_speed` setting (0.1–2.0 s, persisted to settings.json)
-- [x] ~~**Scroll wheel sensitivity**~~ — added `scroll_lines` setting (1–10, persisted to settings.json)
-- [x] ~~**Default terminal dimensions**~~ — added `default_rows`/`default_cols` settings (10–100 × 40–200)
-- [x] ~~**Cursor thickness**~~ — added `beam_width`/`underline_height` settings (1–8 px each)
-- [x] ~~**UI theme colors**~~ — added 7 ColorPicker controls for wrapper, title bar, sidebar, focus, selection, and scrollback colors
 
 ### Repository
 - [ ] **CONTRIBUTING.md** — setup instructions, PR process, and code style guide for contributors
