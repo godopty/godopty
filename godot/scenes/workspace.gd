@@ -122,13 +122,14 @@ func _spawn(shell := DEFAULT_SHELL) -> Control:
 	else:
 		if not _split_for(w):
 			w.queue_free()
-			_show_message("Cannot add terminal — panes would be too small")
+			ToastManager.warn("Cannot add terminal — panes would be too small")
 			return null
 	_grid.add_child(w)
 	_apply_layout()
 	_list()
 	var body = _find_body(w)
 	body.focus_entered.connect(func(): _last_body = body)
+	ToastManager.info("Terminal spawned")
 	return body
 
 func _split_for(w: Control) -> bool:
@@ -165,6 +166,7 @@ func _kill(body: Control):
 		_expand_partial(rm)
 
 	rm.wrapper.queue_free()
+	ToastManager.info("Terminal closed")
 	_apply_layout()
 	_list()
 
@@ -443,7 +445,9 @@ func _save():
 			if s is Dictionary: d.merge(s)
 		arr.append(d)
 	var f = FileAccess.open(LAYOUT_FILE, FileAccess.WRITE)
-	if f: f.store_string(JSON.stringify({"tiles": arr}, "\t"))
+	if f:
+		f.store_string(JSON.stringify({"tiles": arr}, "\t"))
+		ToastManager.info("Layout saved")
 
 func _restore():
 	if not FileAccess.file_exists(LAYOUT_FILE): return

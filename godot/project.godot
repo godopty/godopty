@@ -18,6 +18,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 FocusManager="*res://scenes/focus_manager.gd"
+ToastManager="*res://scenes/toast_manager.gd"
 
 [display]
 
