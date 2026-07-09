@@ -519,7 +519,7 @@ func _apply_settings_to(body: Control):
 	body.focus_border_color = _cfg_focus_border
 	body.selection_color = _cfg_selection
 	body.scrollback_indicator_color = _cfg_scrollback_indicator
-	_apply_color_scheme(body)
+	body.color_scheme_path = _cfg_color_scheme_path
 	body.font_path = _cfg_font_path
 	body.font_size = _cfg_font_size
 
@@ -700,7 +700,9 @@ func _add_scheme_picker(v: VBoxContainer):
 		_cfg_color_scheme_path = path
 		_save_settings()
 		var all2: Array[Control] = []; _collect_bodies(all2)
-		for body in all2: _apply_color_scheme(body))
+		for body in all2:
+			body.color_scheme_path = path
+			body._apply_stored_scheme())
 
 func _add_font_picker(v: VBoxContainer):
 	_add_file_picker(v, "Font:", _cfg_font_path, [["*.ttf", "TrueType Fonts"]], func(path: String):

@@ -22,6 +22,7 @@ const PRINTABLE_ASCII_MAX = 126
 @export var focus_border_color: Color = FOCUS_BORDER_COLOR
 @export var selection_color: Color = SELECTION_COLOR
 @export var scrollback_indicator_color: Color = SCROLLBACK_INDICATOR_COLOR
+var color_scheme_path: String = ""
 
 @export var shell_command: String = "/bin/bash"
 @export var rows: int = 24
@@ -70,6 +71,9 @@ func _ready():
 	add_child(_terminal)
 	_terminal.start_shell(shell_command, rows, cols)
 
+	if color_scheme_path != "":
+		_apply_stored_scheme()
+
 	_font = _load_font(font_path, "res://fonts/DejaVuSansMono.ttf")
 	_font_bold = _load_font(font_bold_path, "res://fonts/DejaVuSansMono-Bold.ttf")
 	_font_italic = _load_font(font_italic_path, "res://fonts/DejaVuSansMono-Oblique.ttf")
@@ -97,6 +101,17 @@ func _reload_fonts():
 	_font = _load_font(font_path, "res://fonts/DejaVuSansMono.ttf")
 	_font_bold = _load_font(font_bold_path, "res://fonts/DejaVuSansMono-Bold.ttf")
 	_font_italic = _load_font(font_italic_path, "res://fonts/DejaVuSansMono-Oblique.ttf")
+
+func _apply_stored_scheme():
+	if _terminal == null: return
+	var path = color_scheme_path
+	if path == "" or not FileAccess.file_exists(path):
+		_terminal.set_palette("")
+		return
+	var f = FileAccess.open(path, FileAccess.READ)
+	if not f: return
+	var hex_csv = f.get_as_text().strip_edges().replace("\n", ",").replace(" ", "")
+	_terminal.set_palette(hex_csv)
 
 func _load_font(path: String, fallback: String) -> Font:
 	var f: Font
