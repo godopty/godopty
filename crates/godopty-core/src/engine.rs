@@ -196,10 +196,18 @@ async fn run_terminal_task(
     loop {
         tokio::select! {
             msg = rx.recv() => {
-                let Ok(event) = msg else { break; };
-                let commands = concept::matching_commands(id, &labels, &concepts, &event);
-                for cmd in commands {
-                    let _ = pty_handle.write_line(&cmd);
+                match msg {
+                    Ok(event) => {
+                        let commands = concept::matching_commands(id, &labels, &concepts, &event);
+                        for cmd in commands {
+                            let _ = pty_handle.write_line(&cmd);
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        log::warn!("[Pane {id}] Lagged behind broadcast channel, skipped {skipped} events");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
             msg = pty_rx.recv() => {
