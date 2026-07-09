@@ -247,6 +247,37 @@ impl GodoptyTerminal {
         self.with_grid(|g| g.generation as i64, -1)
     }
 
+    /// Load a color scheme from a comma-separated string of 16 hex colors.
+    /// Example: "#002b36,#dc322f,...". Empty string resets to default.
+    #[func]
+    fn set_palette(&mut self, hex_csv: GString) {
+        let spawned = match &self.spawned {
+            Some(s) => s,
+            None => return,
+        };
+        let mut grid = match spawned.grid.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        if hex_csv.is_empty() {
+            grid.palette = godopty_core::color::SYSTEM_COLORS;
+            return;
+        }
+        let s = hex_csv.to_string();
+        for (i, hex) in s.split(',').enumerate().take(16) {
+            let h = hex.trim();
+            if h.len() == 7 && h.starts_with('#') {
+                if let (Ok(r), Ok(g), Ok(b)) = (
+                    u8::from_str_radix(&h[1..3], 16),
+                    u8::from_str_radix(&h[3..5], 16),
+                    u8::from_str_radix(&h[5..7], 16),
+                ) {
+                    grid.palette[i] = [r, g, b];
+                }
+            }
+        }
+    }
+
     /// Return all rows as `Array[Array[Dictionary]]`.
     ///
     /// Each dictionary has keys: `"ch"` (String), `"fg"` (Color), `"bg"` (Color).

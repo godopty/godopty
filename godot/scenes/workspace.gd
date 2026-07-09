@@ -61,6 +61,7 @@ var _cfg_sidebar_bg := SIDEBAR_BG_COLOR
 var _cfg_focus_border := TerminalPane.FOCUS_BORDER_COLOR
 var _cfg_selection := TerminalPane.SELECTION_COLOR
 var _cfg_scrollback_indicator := TerminalPane.SCROLLBACK_INDICATOR_COLOR
+var _cfg_color_scheme_path := ""
 var _cfg_font_path := "res://fonts/DejaVuSansMono.ttf"
 var _cfg_font_size := 14
 
@@ -493,11 +494,12 @@ func _load_settings():
 		_cfg_focus_border = _color_from_hex(d.get("focus_border", ""), TerminalPane.FOCUS_BORDER_COLOR)
 		_cfg_selection = _color_from_hex(d.get("selection", ""), TerminalPane.SELECTION_COLOR)
 		_cfg_scrollback_indicator = _color_from_hex(d.get("scrollback_indicator", ""), TerminalPane.SCROLLBACK_INDICATOR_COLOR)
+		_cfg_color_scheme_path = d.get("color_scheme", "")
 		_cfg_font_path = d.get("font_path", "res://fonts/DejaVuSansMono.ttf")
 		_cfg_font_size = d.get("font_size", 14)
 
 func _save_settings():
-	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "beam_width": _cfg_beam_width, "underline_height": _cfg_underline_height, "wrapper_bg": _cfg_wrapper_bg.to_html(), "title_bar_bg": _cfg_title_bar_bg.to_html(), "wrapper_border": _cfg_wrapper_border.to_html(), "sidebar_bg": _cfg_sidebar_bg.to_html(), "focus_border": _cfg_focus_border.to_html(), "selection": _cfg_selection.to_html(), "scrollback_indicator": _cfg_scrollback_indicator.to_html(), "font_path": _cfg_font_path, "font_size": _cfg_font_size}
+	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "beam_width": _cfg_beam_width, "underline_height": _cfg_underline_height, "wrapper_bg": _cfg_wrapper_bg.to_html(), "title_bar_bg": _cfg_title_bar_bg.to_html(), "wrapper_border": _cfg_wrapper_border.to_html(), "sidebar_bg": _cfg_sidebar_bg.to_html(), "focus_border": _cfg_focus_border.to_html(), "selection": _cfg_selection.to_html(), "scrollback_indicator": _cfg_scrollback_indicator.to_html(), "color_scheme": _cfg_color_scheme_path, "font_path": _cfg_font_path, "font_size": _cfg_font_size}
 	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d))
 
@@ -517,6 +519,7 @@ func _apply_settings_to(body: Control):
 	body.focus_border_color = _cfg_focus_border
 	body.selection_color = _cfg_selection
 	body.scrollback_indicator_color = _cfg_scrollback_indicator
+	_apply_color_scheme(body)
 	body.font_path = _cfg_font_path
 	body.font_size = _cfg_font_size
 
@@ -552,6 +555,7 @@ func _build_settings() -> Control:
 	var dims = _add_dims_control(v)
 	var cursor_px = _add_cursor_thickness_control(v)
 	_add_font_picker(v)
+	_add_scheme_picker(v)
 	var color_btns = _add_color_section(v)
 
 	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
@@ -680,6 +684,22 @@ func _add_file_picker(v: VBoxContainer, label: String, current_path: String, fil
 	h.add_child(btn)
 	v.add_child(h)
 
+func _apply_color_scheme(body: Control):
+	if _cfg_color_scheme_path == "" or not FileAccess.file_exists(_cfg_color_scheme_path):
+		body.set_palette("")
+		return
+	var f = FileAccess.open(_cfg_color_scheme_path, FileAccess.READ)
+	if not f: return
+	var hex_csv = f.get_as_text().strip_edges().replace("\n", ",").replace(" ", "")
+	body.set_palette(hex_csv)
+
+func _add_scheme_picker(v: VBoxContainer):
+	_add_file_picker(v, "Color scheme:", _cfg_color_scheme_path, [["*.txt; *.json; *.csv", "Scheme files"]], func(path: String):
+		_cfg_color_scheme_path = path
+		_save_settings()
+		var all2: Array[Control] = []; _collect_bodies(all2)
+		for body in all2: _apply_color_scheme(body))
+
 func _add_font_picker(v: VBoxContainer):
 	_add_file_picker(v, "Font:", _cfg_font_path, [["*.ttf", "TrueType Fonts"]], func(path: String):
 		_cfg_font_path = path
@@ -745,6 +765,7 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		_cfg_focus_border = TerminalPane.FOCUS_BORDER_COLOR
 		_cfg_selection = TerminalPane.SELECTION_COLOR
 		_cfg_scrollback_indicator = TerminalPane.SCROLLBACK_INDICATOR_COLOR
+		_cfg_color_scheme_path = ""
 		_cfg_font_path = "res://fonts/DejaVuSansMono.ttf"
 		_cfg_font_size = 14
 		_save_settings()
