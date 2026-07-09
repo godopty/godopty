@@ -574,9 +574,6 @@ func _build_settings() -> Control:
 	# Reset
 	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, dims, cursor_px, color_btns, fs_spin)
 
-	bg.gui_input.connect(func(ev: InputEvent):
-		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
-			_settings_panel.visible = false)
 	return bg
 
 func _add_settings_header(v: VBoxContainer):
@@ -785,6 +782,11 @@ func _apply_current_settings(cursor_shape: int, cursor_blink: bool, font_size: i
 
 func _input(event):
 	if not (event is InputEventKey and event.pressed): return
+	if event.keycode == KEY_ESCAPE:
+		if _settings_panel and _settings_panel.visible:
+			_settings_panel.visible = false; accept_event(); return
+		if _palette and _palette.visible:
+			_palette.visible = false; accept_event(); return
 	if event.keycode == KEY_R and event.ctrl_pressed and event.shift_pressed:
 		_sidebar_on = true; _sidebar.show(); _sidebar_bg.show()
 		_reset(); _apply_layout(); _list()
@@ -797,9 +799,13 @@ func _input(event):
 			KEY_P: _toggle_palette(); accept_event()
 
 func _toggle_palette():
-	if _palette == null: _palette = _build_palette(); add_child(_palette)
+	if _palette == null:
+		_palette = _build_palette()
+		add_child(_palette)
 	_palette.visible = not _palette.visible
-	if _palette.visible: _palette.get_node("PaletteVBox/LineEdit").grab_focus()
+	if _palette.visible:
+		var inp = _palette.find_child("*", true, false) as LineEdit
+		if inp: inp.grab_focus()
 
 func _build_palette() -> Control:
 	var bg = Panel.new(); bg.size = Vector2(PALETTE_PANEL_W, PALETTE_PANEL_H); bg.position = (size - bg.size) * 0.5
@@ -812,8 +818,7 @@ func _build_palette() -> Control:
 			if t == "" or c.find(t) != -1: lst.add_item(c))
 	inp.text_submitted.connect(func(t: String): _run(t); _palette.visible = false)
 	lst.item_activated.connect(func(i: int): _run(lst.get_item_text(i)); _palette.visible = false)
-	inp.gui_input.connect(func(e: InputEvent):
-		if e is InputEventKey and e.pressed and e.keycode == KEY_ESCAPE: _palette.visible = false)
+
 	return bg
 
 func _run(c: String):
