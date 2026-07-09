@@ -270,6 +270,9 @@ The Concept Engine allows developers to automate repetitive workflows based on s
 - [ ] **Interactive Output** — Convert specific text patterns (such as file paths and line numbers) into clickable UI elements that open integrated viewers or external editors.
 - [ ] **Dynamic Shaders** — Expose Godot's shading language to the terminal background, enabling CRT effects, glassmorphism, or state-based visual feedback.
 - [ ] **Reactive Environments** — Link terminal events to global UI state, such as shifting the application tint to red upon detecting a panic, or emitting subtle particle effects on successful test suites.
+- [ ] **Variable Substitution (CLI AI)** — Add `{payload}` string interpolation to the Concept Engine's action templates. Allows passing extracted tokens from one pane into another's shell (e.g., injecting an error string into an ephemeral `ollama run` command).
+- [ ] **Persistent REPL Injection** — Support routing event payloads directly into the `stdin` of a running script, enabling persistent context-aware agents in adjacent panes.
+- [ ] **Native AI Observer Pane** — Build a dedicated Godot pane that subscribes directly to the `WorkspaceEngine`. By bypassing shell escaping entirely, it safely catches multi-line tracebacks in-memory, queries an LLM API natively, and renders the explanation via a Markdown `RichTextLabel`.
 
 ---
 
