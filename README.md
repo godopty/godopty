@@ -2,6 +2,17 @@
 
 **A Godot-based Rust multi-PTY emulator** — a desktop application for creating, expanding, and orchestrating terminal sessions in a fluid, grid-based GUI.
 
+## Core Philosophy
+
+Godopty occupies the middle ground between rigid, GPU-accelerated terminals and feature-heavy, web-based terminals. It combines the speed of native systems programming with the rendering flexibility of a game engine.
+
+- **Reactive Automation**: Rather than acting as a passive text pipe, the terminal reads its own output. The built-in pub-sub engine detects matched patterns and automatically executes fixes, restarts, or notifications in adjacent panes.
+- **Unrestricted Aesthetics**: Built on Godot, the UI is hardware-accelerated. It supports fluid animations, instant theming, and rich UI overlays without the memory overhead of an embedded browser.
+- **Zero-Friction Tiling**: Managing multiple panes relies on a native graphical grid and drag-and-drop mechanics, bypassing the need to memorize complex keyboard multiplexer bindings.
+- **Open Source and Local**: The application is fully open source. There is no telemetry, no mandatory login, and complete control over local data.
+
+---
+
 ## Architecture Overview
 
 ```
@@ -186,8 +197,18 @@ Concept {
 
 Self-reaction loops are prevented: a terminal ignores events where `source_pane == my_id`.
 
+**Security Warning:** The Concept Engine is designed to execute commands automatically based on terminal output. Do not bind destructive or high-privilege actions (like `rm` or `sudo`) to easily spoofable regex triggers. An attacker could intentionally print matching text to trick your terminal into executing the action payload.
+
+## Use Cases
+
+The Concept Engine allows developers to automate repetitive workflows based on standard shell output.
+
+- **Auto-Restarting Watchers**: Detect a segmentation fault or panic string in a backend server pane, and automatically inject a restart command into an adjacent management pane.
+- **Port Conflict Resolution**: Detect an "Address already in use" error and immediately run an `lsof` or `kill` command to clear the bound port.
+- **AI Observer**: Pipe error blocks (such as a Python traceback or Rust compiler error) to a local language model, displaying a plain-English explanation and a proposed fix in a secondary pane.
+- **Automated Documentation**: Match specific compiler error codes and automatically open the relevant local or web documentation in an adjacent window.
+
 ---
-> **⚠️ Security Warning:** The Concept Engine is designed to execute commands automatically based on terminal output. Do not bind destructive or high-privilege actions (like `rm` or `sudo`) to easily spoofable regex triggers. An attacker could intentionally print matching text to trick your terminal into executing the action payload.
 
 ## Implementation Phases
 
@@ -242,6 +263,13 @@ Self-reaction loops are prevented: a terminal ignores events where `source_pane 
 - [ ] SQLite + FTS5 async logging backend
 - [ ] Session history persistence between restarts
 - [ ] `SIGWINCH` handling (Godot resize → PTY resize signal)
+
+### Phase 4 — Reactive UX & Visual Scripting
+
+- [ ] **Visual Concept Graph** — Allow users to build concept automations visually using Godot's GraphEdit nodes, connecting regex matchers to output filters and action triggers without writing JSON.
+- [ ] **Interactive Output** — Convert specific text patterns (such as file paths and line numbers) into clickable UI elements that open integrated viewers or external editors.
+- [ ] **Dynamic Shaders** — Expose Godot's shading language to the terminal background, enabling CRT effects, glassmorphism, or state-based visual feedback.
+- [ ] **Reactive Environments** — Link terminal events to global UI state, such as shifting the application tint to red upon detecting a panic, or emitting subtle particle effects on successful test suites.
 
 ---
 
