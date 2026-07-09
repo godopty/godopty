@@ -196,7 +196,7 @@ func _draw_cells(off: Vector2, baseline: float):
 			if skip_next:
 				skip_next = false
 				continue
-			var idx = r * cols + c
+			var idx = r * n_cols + c
 			var ch: String = chars[r][c]
 			var fg = fg_arr[idx] as Color
 			var bg = bg_arr[idx] as Color
