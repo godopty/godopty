@@ -44,8 +44,8 @@ pub fn color_to_rgb(color: &Color, palette: &[[u8; 3]; 16]) -> [u8; 3] {
 /// Map standard 16 ANSI named colors to approximate RGB values.
 fn named_to_rgb(named: &NamedColor, palette: &[[u8; 3]; 16]) -> [u8; 3] {
     match named {
-        NamedColor::Background => CellInfo::DEFAULT_BG,
-        NamedColor::Foreground => CellInfo::DEFAULT_FG,
+        NamedColor::Background => palette[0],
+        NamedColor::Foreground => palette[7],
         NamedColor::Black => palette[0],
         NamedColor::Red => palette[1],
         NamedColor::Green => palette[2],
@@ -122,5 +122,18 @@ mod tests {
         // Grayscale ramp boundaries
         assert_eq!(indexed_to_rgb(232, &palette), [8, 8, 8]);
         assert_eq!(indexed_to_rgb(255, &palette), [238, 238, 238]);
+    }
+
+    #[test]
+    fn named_bg_fg_uses_palette() {
+        let palette = SYSTEM_COLORS;
+        // Background should use palette[0], Foreground should use palette[7]
+        assert_eq!(named_to_rgb(&NamedColor::Background, &palette), palette[0]);
+        assert_eq!(named_to_rgb(&NamedColor::Foreground, &palette), palette[7]);
+        // Verify they are NOT the DEFAULT_BG/DEFAULT_FG constants
+        assert_ne!(named_to_rgb(&NamedColor::Background, &palette), CellInfo::DEFAULT_BG,
+            "Background should use palette, not hardcoded DEFAULT_BG");
+        assert_ne!(named_to_rgb(&NamedColor::Foreground, &palette), CellInfo::DEFAULT_FG,
+            "Foreground should use palette, not hardcoded DEFAULT_FG");
     }
 }
