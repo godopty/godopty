@@ -256,32 +256,43 @@ func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Labe
 	var bar = Control.new()
 	bar.custom_minimum_size = Vector2(0, TITLE_BAR_HEIGHT)
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(bar)
+
+	# Background fill
 	var tbg = ColorRect.new()
 	tbg.color = TITLE_BAR_BG_COLOR
 	tbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bar.add_child(tbg)
-	var center = CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bar.add_child(center)
-	var hbox = HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 2)
-	center.add_child(hbox)
-	parent.add_child(bar)
 
+	# Centered label (fills bar, text centered both axes)
 	var lbl = Label.new()
 	lbl.text = " " + (shell.get_file() if shell else "terminal")
-	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hbox.add_child(lbl)
+	bar.add_child(lbl)
 
-	for item in [
-		["_", func(): _toggle_minimize(root)],
-		["✕", func(): _kill(_find_body(root))],
-	]:
-		var btn = Button.new()
-		btn.text = item[0]; btn.flat = true; btn.focus_mode = Control.FOCUS_NONE
-		btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
-		btn.pressed.connect(item[1]); hbox.add_child(btn)
+	# Right-aligned buttons
+	var btn_hbox = HBoxContainer.new()
+	btn_hbox.add_theme_constant_override("separation", 2)
+	btn_hbox.anchor_left = 1.0; btn_hbox.anchor_right = 1.0
+	btn_hbox.anchor_top = 0.0; btn_hbox.anchor_bottom = 1.0
+	var btn_total = 2 * BUTTON_MIN_WIDTH + 6
+	btn_hbox.offset_left = -btn_total
+	btn_hbox.offset_right = -2
+	bar.add_child(btn_hbox)
+
+	var min_btn = Button.new()
+	min_btn.text = "▼"; min_btn.focus_mode = Control.FOCUS_NONE
+	min_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
+	min_btn.pressed.connect(func(): _toggle_minimize(root, min_btn))
+	btn_hbox.add_child(min_btn)
+
+	var close_btn = Button.new()
+	close_btn.text = "✕"; close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
+	close_btn.pressed.connect(func(): _kill(_find_body(root)))
+	btn_hbox.add_child(close_btn)
 
 	return lbl
 
@@ -299,9 +310,11 @@ func _show_message(msg: String):
 	t.tween_property(lbl, "modulate:a", 0.0, TOAST_DURATION).set_delay(TOAST_DELAY)
 	t.tween_callback(lbl.queue_free)
 
-func _toggle_minimize(w: Control):
+func _toggle_minimize(w: Control, btn: Button):
 	var body = _find_body(w)
-	if body: body.visible = not body.visible
+	if body:
+		body.visible = not body.visible
+		btn.text = "▼" if body.visible else "▲"
 
 # ═══════════════════════════════════════════════════════════════════════
 # Sidebar
