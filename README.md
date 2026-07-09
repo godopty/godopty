@@ -286,7 +286,7 @@ Features planned for future phases, roughly prioritized:
 - [ ] **Tab/workspace switching** — multiple named workspaces per session
 - [ ] **Title bar right-click menu** — split/close/move options
 - [ ] **Drag-and-drop file paths** — drop a file on terminal to insert its path
-- [ ] **Wrapped text selection** — replace rectangular (block) selection with standard terminal wrapped/flow selection for correct copy/paste
+- [x] ~~**Wrapped text selection**~~ — replace rectangular (block) selection with standard terminal wrapped/flow selection for correct copy/paste
 
 ### Pane Types
 - [ ] **File tree viewer** — Godot `Tree` node populated via `DirAccess` API
