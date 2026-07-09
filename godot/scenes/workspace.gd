@@ -62,6 +62,7 @@ var _cfg_focus_border := TerminalPane.FOCUS_BORDER_COLOR
 var _cfg_selection := TerminalPane.SELECTION_COLOR
 var _cfg_scrollback_indicator := TerminalPane.SCROLLBACK_INDICATOR_COLOR
 var _cfg_color_scheme_path := ""
+var _cfg_max_fps := 0
 var _cfg_font_path := "res://fonts/DejaVuSansMono.ttf"
 var _cfg_font_size := 14
 
@@ -77,6 +78,7 @@ func _ready():
 	show()
 	DisplayServer.window_set_min_size(Vector2i(MIN_WINDOW_W, MIN_WINDOW_H))
 	_load_settings()
+	_apply_fps_setting()
 
 	_grid = Control.new()
 	add_child(_grid)
@@ -89,6 +91,9 @@ func _ready():
 func _notification(what):
 	if what == NOTIFICATION_RESIZED: _apply_layout()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST: _save()
+
+var _fps_label: Label = null
+	
 
 # ═══════════════════════════════════════════════════════════════════════
 # Layout
@@ -336,6 +341,7 @@ func _build_sidebar():
 	_sidebar.add_child(v)
 
 	_add_sidebar_header(v)
+	_add_sidebar_fps(v)
 	_add_sidebar_buttons(v)
 	_add_pane_list(v)
 	_add_collapsed_button()
@@ -346,6 +352,19 @@ func _make_sidebar_bg() -> ColorRect:
 	bg.size = Vector2(SIDEBAR_WIDTH, 0); bg.anchor_top = 0.0; bg.anchor_bottom = 1.0; bg.anchor_right = 0.0
 	add_child(bg)
 	return bg
+
+func _add_sidebar_fps(v: VBoxContainer):
+	_fps_label = Label.new()
+	_fps_label.name = "FpsLabel"
+	_fps_label.add_theme_font_size_override("font_size", 11)
+	_fps_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+	_fps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_fps_label.text = "FPS: --"
+	v.add_child(_fps_label)
+
+func _process(delta):
+	if _fps_label and Engine.get_process_frames() % 10 == 0:
+		_fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 
 func _add_sidebar_header(v: VBoxContainer):
 	var h = HBoxContainer.new(); h.name = "Header"
@@ -495,11 +514,12 @@ func _load_settings():
 		_cfg_selection = _color_from_hex(d.get("selection", ""), TerminalPane.SELECTION_COLOR)
 		_cfg_scrollback_indicator = _color_from_hex(d.get("scrollback_indicator", ""), TerminalPane.SCROLLBACK_INDICATOR_COLOR)
 		_cfg_color_scheme_path = d.get("color_scheme", "")
+		_cfg_max_fps = d.get("max_fps", 0)
 		_cfg_font_path = d.get("font_path", "res://fonts/DejaVuSansMono.ttf")
 		_cfg_font_size = d.get("font_size", 14)
 
 func _save_settings():
-	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "beam_width": _cfg_beam_width, "underline_height": _cfg_underline_height, "wrapper_bg": _cfg_wrapper_bg.to_html(), "title_bar_bg": _cfg_title_bar_bg.to_html(), "wrapper_border": _cfg_wrapper_border.to_html(), "sidebar_bg": _cfg_sidebar_bg.to_html(), "focus_border": _cfg_focus_border.to_html(), "selection": _cfg_selection.to_html(), "scrollback_indicator": _cfg_scrollback_indicator.to_html(), "color_scheme": _cfg_color_scheme_path, "font_path": _cfg_font_path, "font_size": _cfg_font_size}
+	var d = {"cursor_shape": _cfg_cursor_shape, "cursor_blink": _cfg_cursor_blink, "cursor_blink_speed": _cfg_cursor_blink_speed, "scroll_lines": _cfg_scroll_lines, "default_rows": _cfg_default_rows, "default_cols": _cfg_default_cols, "beam_width": _cfg_beam_width, "underline_height": _cfg_underline_height, "wrapper_bg": _cfg_wrapper_bg.to_html(), "title_bar_bg": _cfg_title_bar_bg.to_html(), "wrapper_border": _cfg_wrapper_border.to_html(), "sidebar_bg": _cfg_sidebar_bg.to_html(), "focus_border": _cfg_focus_border.to_html(), "selection": _cfg_selection.to_html(), "scrollback_indicator": _cfg_scrollback_indicator.to_html(), "color_scheme": _cfg_color_scheme_path, "max_fps": _cfg_max_fps, "font_path": _cfg_font_path, "font_size": _cfg_font_size}
 	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d))
 
@@ -556,6 +576,7 @@ func _build_settings() -> Control:
 	var cursor_px = _add_cursor_thickness_control(v)
 	_add_font_picker(v)
 	_add_scheme_picker(v)
+	_add_fps_control(v)
 	var color_btns = _add_color_section(v)
 
 	# Debounce timer — defers the apply so rapid changes (e.g. SpinBox drag)
@@ -695,6 +716,21 @@ func _apply_color_scheme(body: Control):
 	var hex_csv = f.get_as_text().strip_edges().replace("\n", ",").replace(" ", "")
 	term.set_palette(hex_csv)
 
+func _add_fps_control(v: VBoxContainer):
+	var hf = HBoxContainer.new()
+	hf.add_child(_lbl("Max FPS:", 13))
+	var fps_opt = OptionButton.new(); fps_opt.name = "FpsOpt"
+	fps_opt.add_item("60"); fps_opt.add_item("120"); fps_opt.add_item("144")
+	fps_opt.add_item("165"); fps_opt.add_item("240"); fps_opt.add_item("Native"); fps_opt.add_item("Unlimited")
+	var presets = [60, 120, 144, 165, 240, -1, 0]
+	fps_opt.selected = presets.find(_cfg_max_fps)
+	fps_opt.item_selected.connect(func(idx: int):
+		_cfg_max_fps = presets[idx]
+		_save_settings()
+		_apply_fps_setting())
+	hf.add_child(fps_opt)
+	v.add_child(hf)
+
 func _add_scheme_picker(v: VBoxContainer):
 	_add_file_picker(v, "Color scheme:", _cfg_color_scheme_path, [["*.txt; *.json; *.csv", "Scheme files"]], func(path: String):
 		_cfg_color_scheme_path = path
@@ -822,6 +858,7 @@ func _input(event):
 			KEY_W: _kill_last(); accept_event()
 			KEY_B: _toggle_sidebar(); accept_event()
 			KEY_P: _toggle_palette(); accept_event()
+			KEY_F: _toggle_fps(); accept_event()
 
 func _toggle_palette():
 	if _palette == null:
@@ -831,6 +868,16 @@ func _toggle_palette():
 	if _palette.visible:
 		var inp = _palette.find_child("*", true, false) as LineEdit
 		if inp: inp.grab_focus()
+
+func _toggle_fps():
+	if _fps_label: _fps_label.visible = not _fps_label.visible
+
+func _apply_fps_setting():
+	if _cfg_max_fps == -1:
+		var rr = DisplayServer.screen_get_refresh_rate()
+		Engine.max_fps = int(rr) if rr > 0 else 0
+	else:
+		Engine.max_fps = _cfg_max_fps
 
 func _build_palette() -> Control:
 	var bg = Panel.new(); bg.size = Vector2(PALETTE_PANEL_W, PALETTE_PANEL_H); bg.position = (size - bg.size) * 0.5
