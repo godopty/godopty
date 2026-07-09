@@ -334,6 +334,7 @@ impl GodoptyTerminal {
         dict.set("italic", &Variant::from(cell.italic));
         dict.set("underline", &Variant::from(cell.underline));
         dict.set("inverse", &Variant::from(cell.inverse));
+        dict.set("wide", &Variant::from(cell.wide));
         dict
     }
 }

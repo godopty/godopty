@@ -171,8 +171,13 @@ func _draw():
 func _draw_cells(off: Vector2, baseline: float):
 	for r in _cell_cache.size():
 		var row: Array = _cell_cache[r]
+		var skip_next = false
 		for c in row.size():
+			if skip_next:
+				skip_next = false
+				continue
 			var cell: Dictionary = row[c]
+			if cell.get("wide", false): skip_next = true
 			var x = off.x + c * _cell_w; var y = off.y + r * _cell_h
 			var fg = cell["fg"] as Color; var bg = cell["bg"] as Color
 			if cell.get("inverse", false): var tmp = fg; fg = bg; bg = tmp
@@ -279,7 +284,9 @@ func _mouse_to_cell(pos: Vector2) -> Vector2i:
 	return Vector2i(int((pos.x - off.x) / _cell_w), int((pos.y - off.y) / _cell_h))
 
 func _key_to_text(event: InputEventKey) -> String:
-	if event.unicode >= PRINTABLE_ASCII_MIN and event.unicode <= PRINTABLE_ASCII_MAX: return char(event.unicode)
+	if event.ctrl_pressed and event.keycode >= KEY_A and event.keycode <= KEY_Z:
+		return char(event.keycode - KEY_A + 1)
+	if event.unicode >= 32 and event.unicode != 127: return char(event.unicode)
 	match event.keycode:
 		KEY_BACKSPACE: return "\u007f"
 		KEY_TAB: return "\t"

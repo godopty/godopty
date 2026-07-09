@@ -195,24 +195,27 @@ async fn run_terminal_task(
 
     loop {
         tokio::select! {
-            Ok(event) = rx.recv() => {
+            msg = rx.recv() => {
+                let Ok(event) = msg else { break; };
                 let commands = concept::matching_commands(id, &labels, &concepts, &event);
                 for cmd in commands {
                     let _ = pty_handle.write_line(&cmd);
                 }
             }
-            Some(bytes) = pty_rx.recv() => {
+            msg = pty_rx.recv() => {
+                let Some(bytes) = msg else { break; };
                 let lines = line_parser.feed(&bytes);
                 for line in lines {
                     concept::match_and_broadcast(id, &concepts, &tx, &line);
                 }
-                if let Some(ref g) = grid {
+                if let Some(g) = &grid {
                     if let Ok(mut locked) = g.lock() {
                         locked.feed(&bytes);
                     }
                 }
             }
-            Some(input) = stdin_rx.recv() => {
+            msg = stdin_rx.recv() => {
+                let Some(input) = msg else { break; };
                 match input {
                     StdinInput::Line(line) => {
                         let _ = pty_handle.write_line(&line);
@@ -222,7 +225,7 @@ async fn run_terminal_task(
                     }
                     StdinInput::Resize { rows, cols } => {
                         let _ = pty_handle.resize(rows, cols);
-                        if let Some(ref g) = grid {
+                        if let Some(g) = &grid {
                             if let Ok(mut locked) = g.lock() {
                                 locked.resize(rows as usize, cols as usize);
                             }

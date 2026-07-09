@@ -41,6 +41,7 @@ pub struct CellInfo {
     pub italic: bool,
     pub underline: bool,
     pub inverse: bool,
+    pub wide: bool,
 }
 
 /// A simple [`Dimensions`] implementation used for creating and resizing
@@ -264,6 +265,7 @@ impl Default for CellInfo {
             italic: false,
             underline: false,
             inverse: false,
+            wide: false,
         }
     }
 }
@@ -284,6 +286,7 @@ impl CellInfo {
             italic: flags.contains(Flags::ITALIC),
             underline: flags.contains(Flags::UNDERLINE),
             inverse: flags.contains(Flags::INVERSE),
+            wide: flags.contains(Flags::WIDE_CHAR),
         }
     }
 }

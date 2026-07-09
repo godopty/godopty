@@ -23,6 +23,12 @@ pub struct PtyHandle {
     _read_thread: thread::JoinHandle<()>,
 }
 
+impl Drop for PtyHandle {
+    fn drop(&mut self) {
+        let _ = self._child.kill();
+    }
+}
+
 impl PtyHandle {
     /// Spawn a shell process in a new PTY and start a reader thread.
     /// Output bytes are sent to `tx` as `Vec<u8>` chunks.
