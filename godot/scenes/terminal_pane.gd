@@ -218,11 +218,14 @@ func _draw_cursor(off: Vector2, baseline: float):
 				draw_string(_font, Vector2(cx, cy + baseline), cursor_ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
 
 func _draw_selection(off: Vector2):
-	var sr0 = mini(_sel_start.y, _sel_end.y); var sr1 = maxi(_sel_start.y, _sel_end.y)
-	var sc0 = mini(_sel_start.x, _sel_end.x); var sc1 = maxi(_sel_start.x, _sel_end.x)
+	var p0 = _sel_start; var p1 = _sel_end
+	if p1.y < p0.y or (p1.y == p0.y and p1.x < p0.x):
+		p0 = _sel_end; p1 = _sel_start
+	var sr0 = p0.y; var sr1 = p1.y
 	for r in range(sr0, sr1 + 1):
 		if r < 0 or r >= _cell_cache.size(): continue
-		var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1) + 1
+		var cb = p0.x if r == sr0 else 0
+		var ce = (p1.x if r == sr1 else cols - 1) + 1
 		for c in range(cb, ce):
 			if c >= 0 and c < cols:
 				draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), selection_color)
@@ -230,16 +233,19 @@ func _draw_selection(off: Vector2):
 
 func _get_selected_text() -> String:
 	if _sel_start.x < 0 or _sel_end.x < 0 or _cell_cache.is_empty(): return ""
-	var sr0 = mini(_sel_start.y, _sel_end.y); var sr1 = maxi(_sel_start.y, _sel_end.y)
-	var sc0 = mini(_sel_start.x, _sel_end.x); var sc1 = maxi(_sel_start.x, _sel_end.x)
+	var p0 = _sel_start; var p1 = _sel_end
+	if p1.y < p0.y or (p1.y == p0.y and p1.x < p0.x):
+		p0 = _sel_end; p1 = _sel_start
+	var sr0 = p0.y; var sr1 = p1.y
 	var lines: Array[String] = []
 	for r in range(sr0, sr1 + 1):
 		if r < 0 or r >= _cell_cache.size(): continue
 		var row: Array = _cell_cache[r]
-		var cb = sc0 if r == sr0 else 0; var ce = (sc1 if r == sr1 else cols - 1)
+		var cb = maxi(0, p0.x if r == sr0 else 0)
+		var ce = mini(row.size() - 1, p1.x if r == sr1 else cols - 1)
 		var line = ""
 		for c in range(cb, ce + 1):
-			if c < row.size(): line += row[c]["ch"]
+			line += row[c]["ch"]
 		lines.append(line.rstrip(" "))
 	return "\n".join(lines)
 
