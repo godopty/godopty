@@ -387,6 +387,11 @@ func _restore():
 # Palette
 # ═══════════════════════════════════════════════════════════════════════
 
+func _unhandled_input(event):
+	if _palette and _palette.visible and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_palette.visible = false
+		get_viewport().set_input_as_handled()
+
 func _toggle_palette():
 	if _palette == null:
 		_palette = _build_palette()
@@ -400,7 +405,7 @@ func _toggle_fps():
 	pass # fps label is inside sidebar now
 
 func _build_palette() -> Control:
-	var bg = Panel.new(); bg.size = Vector2(350, 240); bg.position = (size - bg.size) * 0.5
+	var bg = Panel.new(); bg.custom_minimum_size = Vector2(350, 240); bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	var v = VBoxContainer.new(); v.name = "PaletteVBox"; bg.add_child(v)
 	var inp = LineEdit.new(); inp.placeholder_text = "Command..."; v.add_child(inp)
 	var lst = ItemList.new(); lst.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(lst)

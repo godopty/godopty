@@ -8,12 +8,19 @@ func _init(workspace: Control):
 	_workspace = workspace
 
 func _ready():
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_ui()
+
+func _unhandled_input(event):
+	if visible and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		visible = false
+		get_viewport().set_input_as_handled()
 
 func _build_ui():
 	var bg = Panel.new()
-	bg.size = Vector2(320, 520)
-	bg.position = (size - bg.size) * 0.5
+	bg.custom_minimum_size = Vector2(320, 520)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	add_child(bg)
 
 	var v = VBoxContainer.new(); v.name = "VBox"
