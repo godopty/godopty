@@ -20,13 +20,13 @@ func _unhandled_input(event):
 func _build_ui():
 	var bg = Panel.new()
 	bg.custom_minimum_size = Vector2(320, 520)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	add_child(bg)
+	bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 
 	var v = VBoxContainer.new(); v.name = "VBox"
 	v.add_theme_constant_override("separation", 6)
-	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.add_child(v)
+	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	_add_settings_header(v)
 	var shape_opt = _add_cursor_control(v)

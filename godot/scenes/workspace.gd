@@ -394,8 +394,9 @@ func _unhandled_input(event):
 
 func _toggle_palette():
 	if _palette == null:
-		_palette = _build_palette()
-		add_child(_palette)
+			_palette = _build_palette()
+			add_child(_palette)
+			_palette.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_palette.visible = not _palette.visible
 	if _palette.visible:
 		var inp = _palette.find_child("*", true, false) as LineEdit
@@ -405,8 +406,9 @@ func _toggle_fps():
 	pass # fps label is inside sidebar now
 
 func _build_palette() -> Control:
-	var bg = Panel.new(); bg.custom_minimum_size = Vector2(350, 240); bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	var bg = Panel.new(); bg.custom_minimum_size = Vector2(350, 240)
 	var v = VBoxContainer.new(); v.name = "PaletteVBox"; bg.add_child(v)
+	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var inp = LineEdit.new(); inp.placeholder_text = "Command..."; v.add_child(inp)
 	var lst = ItemList.new(); lst.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(lst)
 	for c in PALETTE_COMMANDS: lst.add_item(c)
