@@ -166,13 +166,34 @@ func _process(delta):
 		if gen != _last_grid_gen:
 			_last_grid_gen = gen
 			var t0 = Time.get_ticks_msec()
-			_cell_cache = _terminal.get_grid_packed()
+			var updates = _terminal.get_grid_updates(_cell_cache.is_empty())
+			if updates.get("is_full", true):
+				_cell_cache = updates
+			else:
+				var indices: Array = updates["indices"]
+				var chars: Array = updates["chars"]
+				var fg: Array = updates["fg"]
+				var bg: Array = updates["bg"]
+				var attrs: Array = updates["attrs"]
+				var cols: int = _cell_cache["cols"]
+				var cc_chars: Array = _cell_cache["chars"]
+				var cc_fg: Array = _cell_cache["fg"]
+				var cc_bg: Array = _cell_cache["bg"]
+				var cc_attrs: Array = _cell_cache["attrs"]
+				for i in indices.size():
+					var idx: int = indices[i]
+					var r: int = idx / cols
+					var c: int = idx % cols
+					var old_str: String = cc_chars[r]
+					cc_chars[r] = old_str.substr(0, c) + chars[i] + old_str.substr(c + 1)
+					cc_fg[idx] = fg[i]
+					cc_bg[idx] = bg[i]
+					cc_attrs[idx] = attrs[i]
 			_fetch_ms = Time.get_ticks_msec() - t0
 			_cursor_visible = true
 			_cursor_blink_timer = 0.0
 		queue_redraw()
 	_draw_ms = 0  # will be set on next _draw() call
-
 	var t = _terminal.get_title()
 	if t != _last_title and t != "":
 		_last_title = t; title_changed.emit(t)

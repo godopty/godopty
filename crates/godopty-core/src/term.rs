@@ -44,6 +44,17 @@ pub struct CellInfo {
     pub wide: bool,
 }
 
+pub struct CellUpdate {
+    pub row: usize,
+    pub col: usize,
+    pub cell: CellInfo,
+}
+
+pub enum GridUpdate {
+    Full(Vec<Vec<CellInfo>>),
+    Partial(Vec<CellUpdate>),
+}
+
 /// A simple [`Dimensions`] implementation used for creating and resizing
 /// the terminal grid. alacritty_terminal does not ship a concrete size
 /// type — callers provide one via the trait.
@@ -154,6 +165,44 @@ impl TermGrid {
         }
 
         rows
+    }
+
+    /// Fetch damaged cells since the last clear, or a full grid if forced.
+    pub fn get_grid_updates(&mut self, force_full: bool) -> GridUpdate {
+        if force_full {
+            self.term.reset_damage();
+            return GridUpdate::Full(self.renderable_rows());
+        }
+
+        let damage: Vec<_> = match self.term.damage() {
+            alacritty_terminal::term::TermDamage::Full => {
+                self.term.reset_damage();
+                return GridUpdate::Full(self.renderable_rows());
+            }
+            alacritty_terminal::term::TermDamage::Partial(iter) => iter.collect(),
+        };
+
+        let mut updates = Vec::new();
+        let rows = self.renderable_rows();
+        for bounds in damage {
+            let r = bounds.line;
+            let left = bounds.left;
+            let right = bounds.right;
+            if r < rows.len() {
+                for c in left..=right {
+                    if c < rows[r].len() {
+                        updates.push(CellUpdate {
+                            row: r,
+                            col: c,
+                            cell: rows[r][c].clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        self.term.reset_damage();
+        GridUpdate::Partial(updates)
     }
 
     /// Get a direct reference to the underlying alacritty grid.

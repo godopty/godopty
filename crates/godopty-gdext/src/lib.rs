@@ -142,6 +142,20 @@ impl GodoptyTerminal {
             default
         }
     }
+    fn with_grid_mut_ret<T>(&self, f: impl FnOnce(&mut godopty_core::term::TermGrid) -> T, default: T) -> T {
+        if let Some(ref spawned) = self.spawned {
+            match spawned.grid.lock() {
+                Ok(mut g) => f(&mut g),
+                Err(e) => {
+                    godot_error!("godopty: TermGrid lock poisoned: {e}");
+                    default
+                }
+            }
+        } else {
+            default
+        }
+    }
+
 
     /// Lock the grid mutably and call `f`. No-op if no shell or lock poisoned.
     fn with_grid_mut(&self, f: impl FnOnce(&mut godopty_core::term::TermGrid)) {
@@ -317,6 +331,68 @@ impl GodoptyTerminal {
             }, Dictionary::<Variant, Variant>::new(),
         )
     }
+    #[func]
+    fn get_grid_updates(&self, force_full: bool) -> Dictionary<Variant, Variant> {
+        self.with_grid_mut_ret(
+            |g| {
+                let updates = g.get_grid_updates(force_full);
+                match updates {
+                    godopty_core::term::GridUpdate::Full(rows) => {
+                        let n_rows = rows.len();
+                        let n_cols = if n_rows > 0 { rows[0].len() } else { 0 };
+                        let mut chars: Array<Variant> = Array::new();
+                        let mut fg: Array<Variant> = Array::new();
+                        let mut bg: Array<Variant> = Array::new();
+                        let mut attrs: Array<Variant> = Array::new();
+                        for row in rows.iter() {
+                            let mut line = String::with_capacity(n_cols);
+                            for cell in row.iter() {
+                                line.push(cell.ch);
+                                fg.push(&Variant::from(Color::from_rgb(cell.fg[0] as f32 * RGB_SCALE, cell.fg[1] as f32 * RGB_SCALE, cell.fg[2] as f32 * RGB_SCALE)));
+                                bg.push(&Variant::from(Color::from_rgb(cell.bg[0] as f32 * RGB_SCALE, cell.bg[1] as f32 * RGB_SCALE, cell.bg[2] as f32 * RGB_SCALE)));
+                                let mut a: i64 = 0;
+                                if cell.bold { a |= 1; } if cell.italic { a |= 2; } if cell.underline { a |= 4; } if cell.inverse { a |= 8; } if cell.wide { a |= 16; }
+                                attrs.push(&Variant::from(a));
+                            }
+                            chars.push(&Variant::from(line));
+                        }
+                        let mut dict = Dictionary::<Variant, Variant>::new();
+                        dict.set("is_full", &Variant::from(true));
+                        dict.set("rows", &Variant::from(n_rows as i64)); dict.set("cols", &Variant::from(n_cols as i64));
+                        dict.set("chars", &Variant::from(chars)); dict.set("fg", &Variant::from(fg));
+                        dict.set("bg", &Variant::from(bg)); dict.set("attrs", &Variant::from(attrs));
+                        dict
+                    }
+                    godopty_core::term::GridUpdate::Partial(cells) => {
+                        let mut indices: Array<Variant> = Array::new();
+                        let mut chars: Array<Variant> = Array::new();
+                        let mut fg: Array<Variant> = Array::new();
+                        let mut bg: Array<Variant> = Array::new();
+                        let mut attrs: Array<Variant> = Array::new();
+                        let cols = g.num_cols();
+                        for u in cells {
+                            indices.push(&Variant::from((u.row * cols + u.col) as i64));
+                            chars.push(&Variant::from(u.cell.ch.to_string()));
+                            fg.push(&Variant::from(Color::from_rgb(u.cell.fg[0] as f32 * RGB_SCALE, u.cell.fg[1] as f32 * RGB_SCALE, u.cell.fg[2] as f32 * RGB_SCALE)));
+                            bg.push(&Variant::from(Color::from_rgb(u.cell.bg[0] as f32 * RGB_SCALE, u.cell.bg[1] as f32 * RGB_SCALE, u.cell.bg[2] as f32 * RGB_SCALE)));
+                            let mut a: i64 = 0;
+                            if u.cell.bold { a |= 1; } if u.cell.italic { a |= 2; } if u.cell.underline { a |= 4; } if u.cell.inverse { a |= 8; } if u.cell.wide { a |= 16; }
+                            attrs.push(&Variant::from(a));
+                        }
+                        let mut dict = Dictionary::<Variant, Variant>::new();
+                        dict.set("is_full", &Variant::from(false));
+                        dict.set("indices", &Variant::from(indices));
+                        dict.set("chars", &Variant::from(chars));
+                        dict.set("fg", &Variant::from(fg));
+                        dict.set("bg", &Variant::from(bg));
+                        dict.set("attrs", &Variant::from(attrs));
+                        dict
+                    }
+                }
+            }, Dictionary::<Variant, Variant>::new(),
+        )
+    }
+
 
 }
 
