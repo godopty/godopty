@@ -18,28 +18,53 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 
 func _build_ui():
-	var bg = Panel.new()
-	bg.custom_minimum_size = Vector2(320, 520)
+	var bg = PanelContainer.new()
+	bg.custom_minimum_size = Vector2(360, 520)
 	add_child(bg)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 
+	var mc = MarginContainer.new()
+	mc.add_theme_constant_override("margin_left", 16)
+	mc.add_theme_constant_override("margin_right", 16)
+	mc.add_theme_constant_override("margin_top", 16)
+	mc.add_theme_constant_override("margin_bottom", 16)
+	bg.add_child(mc)
+
 	var v = VBoxContainer.new(); v.name = "VBox"
 	v.add_theme_constant_override("separation", 6)
-	bg.add_child(v)
-	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mc.add_child(v)
 
 	_add_settings_header(v)
-	var shape_opt = _add_cursor_control(v)
-	var blink_cb = _add_blink_control(v)
-	var blink_spin = _add_blink_speed_control(v)
-	var fs_spin = _add_font_control(v)
-	var scroll_spin = _add_scroll_control(v)
-	var dims = _add_dims_control(v)
-	var cursor_px = _add_cursor_thickness_control(v)
-	_add_font_picker(v)
-	_add_scheme_picker(v)
-	_add_fps_control(v)
-	var color_btns = _add_color_section(v)
+	v.add_child(HSeparator.new())
+
+	var tabs = TabContainer.new()
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(tabs)
+
+	# Tab 1: Terminal
+	var t_term = _create_tab(tabs, "Terminal")
+	var shape_opt = _add_cursor_control(t_term)
+	var blink_cb = _add_blink_control(t_term)
+	var blink_spin = _add_blink_speed_control(t_term)
+	var cursor_px = _add_cursor_thickness_control(t_term)
+	t_term.add_child(HSeparator.new())
+	var dims = _add_dims_control(t_term)
+	var scroll_spin = _add_scroll_control(t_term)
+
+	# Tab 2: Appearance
+	var t_app = _create_tab(tabs, "Appearance")
+	_add_font_picker(t_app)
+	var fs_spin = _add_font_control(t_app)
+	t_app.add_child(HSeparator.new())
+	_add_scheme_picker(t_app)
+	t_app.add_child(HSeparator.new())
+	var color_btns = _add_color_section(t_app)
+
+	# Tab 3: System
+	var t_sys = _create_tab(tabs, "System")
+	_add_fps_control(t_sys)
+
+	v.add_child(HSeparator.new())
 
 	_debounce_timer = Timer.new()
 	_debounce_timer.name = "DebounceTimer"
@@ -67,21 +92,43 @@ func _build_ui():
 
 	_add_reset_button(v, shape_opt, blink_cb, blink_spin, scroll_spin, dims, cursor_px, color_btns, fs_spin)
 
+func _create_tab(tabs: TabContainer, title: String) -> VBoxContainer:
+	var sc = ScrollContainer.new()
+	sc.name = title
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tabs.add_child(sc)
+
+	var mc = MarginContainer.new()
+	mc.add_theme_constant_override("margin_left", 8)
+	mc.add_theme_constant_override("margin_right", 8)
+	mc.add_theme_constant_override("margin_top", 8)
+	mc.add_theme_constant_override("margin_bottom", 8)
+	mc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.add_child(mc)
+
+	var v = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mc.add_child(v)
+	return v
+
 func _add_settings_header(v: VBoxContainer):
 	var h = HBoxContainer.new()
-	var t = Label.new(); t.text = "Global Settings"; t.add_theme_font_size_override("font_size", 18)
+	var t = Label.new(); t.text = "Settings"; t.add_theme_font_size_override("font_size", 18)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(t)
 	var x = Button.new(); x.text = "X"; x.flat = true
 	x.pressed.connect(func(): visible = false); h.add_child(x)
 	v.add_child(h)
 
-func _lbl(t: String, s: int) -> Label:
-	var l = Label.new(); l.text = t; l.add_theme_font_size_override("font_size", s); return l
+func _lbl(t: String) -> Label:
+	var l = Label.new(); l.text = t; l.add_theme_font_size_override("font_size", 12); return l
 
 func _add_cursor_control(v: VBoxContainer) -> OptionButton:
 	var hs = HBoxContainer.new()
-	hs.add_child(_lbl("Cursor:", 13))
+	hs.add_child(_lbl("Cursor:"))
 	var opt = OptionButton.new(); opt.name = "ShapeOpt"
+	opt.add_theme_font_size_override("font_size", 12)
 	opt.add_item("Block"); opt.add_item("Underline"); opt.add_item("Beam")
 	opt.selected = SettingsManager.cfg_cursor_shape
 	hs.add_child(opt)
@@ -89,15 +136,17 @@ func _add_cursor_control(v: VBoxContainer) -> OptionButton:
 	return opt
 
 func _add_blink_control(v: VBoxContainer) -> CheckBox:
-	var cb = CheckBox.new(); cb.name = "BlinkCb"; cb.text = " Cursor blink"
+	var cb = CheckBox.new(); cb.name = "BlinkCb"; cb.text = "Cursor blink"
+	cb.add_theme_font_size_override("font_size", 12)
 	cb.button_pressed = SettingsManager.cfg_cursor_blink
 	v.add_child(cb)
 	return cb
 
 func _add_blink_speed_control(v: VBoxContainer) -> SpinBox:
 	var hb = HBoxContainer.new()
-	hb.add_child(_lbl("Blink speed:", 13))
+	hb.add_child(_lbl("Blink speed:"))
 	var spin = SpinBox.new(); spin.name = "BlinkSpeedSpin"
+	spin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	spin.min_value = 0.1; spin.max_value = 2.0; spin.step = 0.1
 	spin.value = SettingsManager.cfg_cursor_blink_speed
 	hb.add_child(spin)
@@ -106,8 +155,9 @@ func _add_blink_speed_control(v: VBoxContainer) -> SpinBox:
 
 func _add_font_control(v: VBoxContainer) -> SpinBox:
 	var hf = HBoxContainer.new()
-	hf.add_child(_lbl("Font size:", 13))
+	hf.add_child(_lbl("Font size:"))
 	var spin = SpinBox.new(); spin.name = "FontSpin"
+	spin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	spin.min_value = 8; spin.max_value = 32
 	spin.value = SettingsManager.cfg_font_size
 	hf.add_child(spin)
@@ -116,8 +166,9 @@ func _add_font_control(v: VBoxContainer) -> SpinBox:
 
 func _add_scroll_control(v: VBoxContainer) -> SpinBox:
 	var hs = HBoxContainer.new()
-	hs.add_child(_lbl("Scroll lines:", 13))
+	hs.add_child(_lbl("Scroll lines:"))
 	var spin = SpinBox.new(); spin.name = "ScrollSpin"
+	spin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	spin.min_value = 1; spin.max_value = 10; spin.step = 1
 	spin.value = SettingsManager.cfg_scroll_lines
 	hs.add_child(spin)
@@ -126,13 +177,15 @@ func _add_scroll_control(v: VBoxContainer) -> SpinBox:
 
 func _add_dims_control(v: VBoxContainer) -> Array:
 	var hr = HBoxContainer.new()
-	hr.add_child(_lbl("Default size:", 13))
+	hr.add_child(_lbl("Default size:"))
 	var rspin = SpinBox.new()
+	rspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	rspin.min_value = 10; rspin.max_value = 100
 	rspin.value = SettingsManager.cfg_default_rows
 	hr.add_child(rspin)
-	hr.add_child(_lbl("×", 13))
+	hr.add_child(_lbl("×"))
 	var cspin = SpinBox.new()
+	cspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	cspin.min_value = 40; cspin.max_value = 200
 	cspin.value = SettingsManager.cfg_default_cols
 	hr.add_child(cspin)
@@ -141,7 +194,7 @@ func _add_dims_control(v: VBoxContainer) -> Array:
 
 func _add_color_control(v: VBoxContainer, label: String, value: Color, setter: Callable) -> ColorPickerButton:
 	var h = HBoxContainer.new()
-	h.add_child(_lbl(label, 12))
+	h.add_child(_lbl(label))
 	var btn = ColorPickerButton.new()
 	btn.color = value
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -152,9 +205,12 @@ func _add_color_control(v: VBoxContainer, label: String, value: Color, setter: C
 
 func _add_file_picker(v: VBoxContainer, label: String, current_path: String, filters: Array, on_selected: Callable) -> void:
 	var h = HBoxContainer.new()
-	h.add_child(_lbl(label, 13))
+	h.add_child(_lbl(label))
 	var btn = Button.new()
 	btn.text = current_path.get_file()
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.clip_text = true
+	btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.pressed.connect(func():
 		var dlg = FileDialog.new()
@@ -174,8 +230,9 @@ func _add_file_picker(v: VBoxContainer, label: String, current_path: String, fil
 
 func _add_fps_control(v: VBoxContainer):
 	var hf = HBoxContainer.new()
-	hf.add_child(_lbl("Max FPS:", 13))
+	hf.add_child(_lbl("Max FPS:"))
 	var fps_opt = OptionButton.new(); fps_opt.name = "FpsOpt"
+	fps_opt.add_theme_font_size_override("font_size", 12)
 	fps_opt.add_item("60"); fps_opt.add_item("120"); fps_opt.add_item("144")
 	fps_opt.add_item("165"); fps_opt.add_item("240"); fps_opt.add_item("Native"); fps_opt.add_item("Unlimited")
 	var presets = [60, 120, 144, 165, 240, -1, 0]
@@ -200,7 +257,7 @@ func _add_font_picker(v: VBoxContainer):
 	)
 
 func _add_color_section(v: VBoxContainer) -> Array:
-	v.add_child(_lbl("UI Colors:", 13))
+	v.add_child(_lbl("UI Colors:"))
 	var btns = []
 	for item in [
 		["Wrapper bg", SettingsManager.cfg_wrapper_bg, func(c: Color): SettingsManager.cfg_wrapper_bg = c; _debounce_timer.start()],
@@ -217,17 +274,19 @@ func _add_color_section(v: VBoxContainer) -> Array:
 
 func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
 	var hc = HBoxContainer.new()
-	hc.add_child(_lbl("Cursor px:", 13))
+	hc.add_child(_lbl("Cursor px:"))
 	var bspin = SpinBox.new()
+	bspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	bspin.min_value = 1; bspin.max_value = 8
 	bspin.value = SettingsManager.cfg_beam_width
 	hc.add_child(bspin)
-	hc.add_child(_lbl("beam", 11))
+	hc.add_child(_lbl("beam"))
 	var uspin = SpinBox.new()
+	uspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	uspin.min_value = 1; uspin.max_value = 8
 	uspin.value = SettingsManager.cfg_underline_height
 	hc.add_child(uspin)
-	hc.add_child(_lbl("underline", 11))
+	hc.add_child(_lbl("underline"))
 	v.add_child(hc)
 	return [bspin, uspin]
 
@@ -241,6 +300,7 @@ func _reset_colors(btns: Array):
 
 func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: CheckBox, blink_spin: SpinBox, scroll_spin: SpinBox, dims: Array, cursor_px: Array, color_btns: Array, fs_spin: SpinBox):
 	var btn = Button.new(); btn.text = "Reset to defaults"
+	btn.add_theme_font_size_override("font_size", 12)
 	btn.pressed.connect(func():
 		SettingsManager.cfg_cursor_shape = 0
 		SettingsManager.cfg_cursor_blink = true
