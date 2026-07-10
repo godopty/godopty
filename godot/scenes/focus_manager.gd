@@ -1,26 +1,17 @@
 extends Node
 # Focus Manager — autoload singleton for geographic pane navigation.
-# Listens for Alt+Arrow to jump to the nearest pane in that direction.
 
 const AXIS_ALIGNED_THRESHOLD = 50
 const DIAGONAL_PENALTY = 0.5
 
 func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	set_process_input(true)
+	ShortcutManager.register("focus:left", "Alt+Left", func(): _shift_focus(Vector2(-1, 0)))
+	ShortcutManager.register("focus:right", "Alt+Right", func(): _shift_focus(Vector2(1, 0)))
+	ShortcutManager.register("focus:up", "Alt+Up", func(): _shift_focus(Vector2(0, -1)))
+	ShortcutManager.register("focus:down", "Alt+Down", func(): _shift_focus(Vector2(0, 1)))
 
-func _input(event):
-	if not (event is InputEventKey and event.pressed and event.alt_pressed):
-		return
-
-	var dir: Vector2
-	match event.keycode:
-		KEY_LEFT:  dir = Vector2(-1, 0)
-		KEY_RIGHT: dir = Vector2(1, 0)
-		KEY_UP:    dir = Vector2(0, -1)
-		KEY_DOWN:  dir = Vector2(0, 1)
-		_: return
-
+func _shift_focus(dir: Vector2):
 	var current = get_viewport().gui_get_focus_owner()
 	if current == null:
 		return
