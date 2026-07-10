@@ -22,8 +22,8 @@ func build(bg_rect: ColorRect):
 	bg = bg_rect
 	var v = VBoxContainer.new(); v.name = "SidebarContent"
 	v.add_theme_constant_override("separation", 4)
-	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(v)
+	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	_add_header(v)
 	_add_fps(v)

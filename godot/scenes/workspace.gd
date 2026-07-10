@@ -244,15 +244,15 @@ func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Labe
 
 	var tbg = ColorRect.new()
 	tbg.color = SettingsManager.cfg_title_bar_bg
-	tbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bar.add_child(tbg)
+	tbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var lbl = Label.new()
 	lbl.text = " " + (shell.get_file() if shell else "terminal")
-	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	bar.add_child(lbl)
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var btn_hbox = HBoxContainer.new()
 	btn_hbox.add_theme_constant_override("separation", 2)
