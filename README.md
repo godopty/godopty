@@ -263,6 +263,7 @@ The Concept Engine allows developers to automate repetitive workflows based on s
 - [ ] SQLite + FTS5 async logging backend
 - [ ] Session history persistence between restarts
 - [ ] `SIGWINCH` handling (Godot resize → PTY resize signal)
+- [ ] **Concept Manager UI** — add/edit/remove regex-triggered concepts and action targets through the settings panel
 
 ### Phase 4 — Reactive UX & Visual Scripting
 
