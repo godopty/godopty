@@ -67,6 +67,12 @@ var _last_grid_gen: int = -1
 var _fetch_ms: int = 0
 var _draw_ms: int = 0
 
+var _resize_pending: bool = false
+var _resize_timer: float = 0.0
+const RESIZE_DEBOUNCE = 0.05
+var _time_since_sync: float = 0.0
+const SYNC_INTERVAL = 1.0 / 60.0
+
 func _ready():
 	_terminal = GodoptyTerminal.new()
 	_terminal.name = "GodoptyTerminal"
@@ -91,7 +97,8 @@ func _on_resize():
 	var new_rows = maxi(int((size.y - PADDING) / _cell_h), 1)
 	if new_cols != cols or new_rows != rows:
 		cols = new_cols; rows = new_rows
-		_terminal.resize_grid(rows, cols)
+		_resize_pending = true
+		_resize_timer = 0.0
 
 func _notification(what):
 	if what == NOTIFICATION_RESIZED: _on_resize()
@@ -139,15 +146,24 @@ func _process(delta):
 	else:
 		_cursor_visible = true
 
-	var gen = _terminal.get_grid_generation()
-	if gen != _last_grid_gen:
-		_last_grid_gen = gen
-		var t0 = Time.get_ticks_msec()
-		_cell_cache = _terminal.get_grid_packed()
-		_fetch_ms = Time.get_ticks_msec() - t0
-		_cursor_visible = true
-		_cursor_blink_timer = 0.0
-	queue_redraw()
+	if _resize_pending:
+		_resize_timer += delta
+		if _resize_timer >= RESIZE_DEBOUNCE:
+			_resize_pending = false
+			_terminal.resize_grid(rows, cols)
+
+	_time_since_sync += delta
+	if _time_since_sync >= SYNC_INTERVAL:
+		_time_since_sync = 0.0
+		var gen = _terminal.get_grid_generation()
+		if gen != _last_grid_gen:
+			_last_grid_gen = gen
+			var t0 = Time.get_ticks_msec()
+			_cell_cache = _terminal.get_grid_packed()
+			_fetch_ms = Time.get_ticks_msec() - t0
+			_cursor_visible = true
+			_cursor_blink_timer = 0.0
+		queue_redraw()
 	_draw_ms = 0  # will be set on next _draw() call
 
 	var t = _terminal.get_title()
@@ -199,8 +215,8 @@ func _draw_cells(off: Vector2, baseline: float):
 	var chars: Array = grid["chars"]
 	var fg_arr: Array = grid["fg"]; var bg_arr: Array = grid["bg"]
 	var attrs: Array = grid["attrs"]
-	var skip_next = false
 	for r in n_rows:
+		var skip_next = false
 		for c in n_cols:
 			if skip_next:
 				skip_next = false
