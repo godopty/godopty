@@ -25,10 +25,10 @@ func _input(event):
 	if current == null:
 		return
 
-	# Collect all focusable panes
-	var panes: Array[Control] = _collect_panes(get_tree().root)
-	if panes.is_empty():
-		return
+	var panes_nodes = get_tree().get_nodes_in_group("panes")
+	var panes: Array[Control] = []
+	for n in panes_nodes: if n is Control: panes.append(n)
+	if panes.is_empty(): return
 
 	# Find the geographically closest pane in the given direction
 	var current_center = _pane_center(current)
@@ -59,16 +59,6 @@ func _input(event):
 
 	if best != null:
 		best.grab_focus()
-
-func _collect_panes(node: Node) -> Array[Control]:
-	var result: Array[Control] = []
-	if node is Control and node.focus_mode != Control.FOCUS_NONE:
-		# Only collect terminal panes (they expose _get_layout_state)
-		if node is Control and node.has_method("_get_layout_state"):
-			result.append(node)
-	for child in node.get_children():
-		result.append_array(_collect_panes(child))
-	return result
 
 func _pane_center(node: Control) -> Vector2:
 	var rect = node.get_global_rect()

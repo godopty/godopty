@@ -86,10 +86,9 @@ func _show_next():
 		ERROR:
 			lbl.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
 
-	# Position: bottom-center
-	var viewport_size = get_viewport().get_visible_rect().size
-	lbl.position = Vector2(0, viewport_size.y - 40)
-	lbl.size.x = viewport_size.x
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	lbl.offset_top = -40
+	lbl.offset_bottom = 0
 	add_child(lbl)
 
 	_current_label = lbl

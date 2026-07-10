@@ -80,6 +80,7 @@ var _time_since_sync: float = 0.0
 var _sync_interval: float = 1.0 / 60.0
 
 func _ready():
+	add_to_group("panes")
 	_terminal = GodoptyTerminal.new()
 	_terminal.name = "GodoptyTerminal"
 	add_child(_terminal)
@@ -304,6 +305,8 @@ func _get_selected_text() -> String:
 	return "\n".join(lines)
 
 func _gui_input(event):
+	if event is InputEventKey and ShortcutManager.is_shortcut(event):
+		return
 	if event is InputEventMouseButton or event is InputEventMouseMotion:
 		_handle_mouse(event)
 	elif event is InputEventKey and event.pressed:

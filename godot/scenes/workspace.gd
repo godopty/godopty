@@ -88,6 +88,16 @@ func _ready():
 
 	if FileAccess.file_exists(LAYOUT_FILE): _restore()
 
+	ShortcutManager.register("app:new_pane", "Ctrl+Shift+N", func(): var p = _spawn(); if p: p.grab_focus())
+	ShortcutManager.register("app:close_pane", "Ctrl+Shift+W", _kill_last)
+	ShortcutManager.register("app:toggle_sidebar", "Ctrl+Shift+B", _toggle_sidebar)
+	ShortcutManager.register("app:toggle_palette", "Ctrl+Shift+P", _toggle_palette)
+	ShortcutManager.register("app:toggle_fps", "Ctrl+Shift+F", _toggle_fps)
+	ShortcutManager.register("app:reset_workspace", "Ctrl+Shift+R", func():
+		_sidebar_on = true; _sidebar.show(); _sidebar_bg.show()
+		_reset(); _apply_layout(); _list()
+	)
+
 func _notification(what):
 	if what == NOTIFICATION_RESIZED: _apply_layout()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST: _save()
@@ -855,17 +865,6 @@ func _input(event):
 			_settings_panel.visible = false; accept_event(); return
 		if _palette and _palette.visible:
 			_palette.visible = false; accept_event(); return
-	if event.keycode == KEY_R and event.ctrl_pressed and event.shift_pressed:
-		_sidebar_on = true; _sidebar.show(); _sidebar_bg.show()
-		_reset(); _apply_layout(); _list()
-		return
-	if event.ctrl_pressed and not event.shift_pressed and not event.alt_pressed:
-		match event.keycode:
-			KEY_N: var p = _spawn(); if p: p.grab_focus(); accept_event()
-			KEY_W: _kill_last(); accept_event()
-			KEY_B: _toggle_sidebar(); accept_event()
-			KEY_P: _toggle_palette(); accept_event()
-			KEY_F: _toggle_fps(); accept_event()
 
 func _toggle_palette():
 	if _palette == null:
