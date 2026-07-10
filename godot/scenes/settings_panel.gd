@@ -234,10 +234,17 @@ func _add_file_picker(v: VBoxContainer, label: String, current_path: String, fil
 func _add_fps_control(v: VBoxContainer):
 	var hf = HBoxContainer.new()
 	hf.add_child(_lbl("Max FPS:"))
+	
 	var fps_opt = OptionButton.new(); fps_opt.name = "FpsOpt"
 	fps_opt.add_theme_font_size_override("font_size", 12)
-	fps_opt.add_item("60"); fps_opt.add_item("120"); fps_opt.add_item("144")
-	fps_opt.add_item("165"); fps_opt.add_item("240"); fps_opt.add_item("Native"); fps_opt.add_item("Unlimited")
+	fps_opt.add_item("60");
+	fps_opt.add_item("120");
+	fps_opt.add_item("144")
+	fps_opt.add_item("165");
+	fps_opt.add_item("240");
+	fps_opt.add_item("Native");
+	fps_opt.add_item("Unlimited");
+	
 	var presets = [60, 120, 144, 165, 240, -1, 0]
 	fps_opt.selected = presets.find(SettingsManager.cfg_max_fps)
 	fps_opt.item_selected.connect(func(idx: int):
@@ -276,21 +283,26 @@ func _add_color_section(v: VBoxContainer) -> Array:
 	return btns
 
 func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
-	var hc = HBoxContainer.new()
-	hc.add_child(_lbl("Thickness:"))
+	var h1 = HBoxContainer.new()
+	h1.add_child(_lbl("Beam width (|):"))
 	var bspin = SpinBox.new()
 	bspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	bspin.min_value = 1; bspin.max_value = 8
 	bspin.value = SettingsManager.cfg_beam_width
-	hc.add_child(bspin)
-	hc.add_child(_lbl("px Beam (|)  "))
+	h1.add_child(bspin)
+	h1.add_child(_lbl("px"))
+	v.add_child(h1)
+
+	var h2 = HBoxContainer.new()
+	h2.add_child(_lbl("Underline height (_):"))
 	var uspin = SpinBox.new()
 	uspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	uspin.min_value = 1; uspin.max_value = 8
 	uspin.value = SettingsManager.cfg_underline_height
-	hc.add_child(uspin)
-	hc.add_child(_lbl("px Underline (_)"))
-	v.add_child(hc)
+	h2.add_child(uspin)
+	h2.add_child(_lbl("px"))
+	v.add_child(h2)
+
 	return [bspin, uspin]
 
 func _reset_colors(btns: Array):
