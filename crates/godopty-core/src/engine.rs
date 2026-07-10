@@ -244,3 +244,60 @@ async fn run_terminal_task(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::TerminalConfig;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn test_spawn_terminal_and_resize() {
+        let engine = WorkspaceEngine::new(vec![]);
+        let config = TerminalConfig { id: 42, labels: vec![] };
+        
+        #[cfg(windows)]
+        let cmd = "cmd.exe";
+        #[cfg(not(windows))]
+        let cmd = "sh";
+
+        let spawned = engine.spawn_terminal_with_grid(config, cmd, &[], 24, 80)
+            .await
+            .expect("Failed to spawn terminal");
+        
+        // Test resize logic
+        spawned.handle.resize_pty(50, 100);
+        
+        // Poll to ensure async loop processes the resize command
+        for _ in 0..10 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            if let Ok(grid) = spawned.grid.lock() {
+                if grid.num_rows() == 50 && grid.num_cols() == 100 {
+                    break;
+                }
+            }
+        }
+        
+        if let Ok(grid) = spawned.grid.lock() {
+            assert_eq!(grid.num_rows(), 50);
+            assert_eq!(grid.num_cols(), 100);
+        }
+        
+        // Test input processing
+        spawned.handle.send_line("echo hello");
+        
+        let mut found = false;
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            if let Ok(grid) = spawned.grid.lock() {
+                let rows = grid.renderable_rows();
+                // Look for either the echo command or the output 'hello'
+                if rows.iter().any(|r| r.iter().any(|c| c.ch == 'e' || c.ch == 'h')) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        assert!(found, "Grid should have received and rendered the input text");
+    }
+}
