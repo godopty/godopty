@@ -134,7 +134,7 @@ cargo check
 ### Run the Demos
 
 ```bash
-# Mock terminal demo (validates pub-sub engine)
+# Mock terminal demo (demonstrates pub-sub engine)
 cargo run --bin godopty-cli
 
 # Real-PTY demo (requires Linux or Windows 11)
@@ -219,8 +219,8 @@ The Concept Engine allows developers to automate repetitive workflows based on s
 - [x] ANSI escape sequence stripping via `vte` state machine
 - [x] `WorkspaceEngine` with `tokio::sync::broadcast` pub-sub
 - [x] Concept registry: regex triggers → label-gated action routing
-- [x] Mock terminal demo validating 3-terminal fan-out routing
-- [x] Real-PTY demo validating end-to-end pipeline (bash → vte → regex → broadcast → cross-PTY injection)
+- [x] Mock terminal demo demonstrating 3-terminal fan-out routing
+- [x] Real-PTY demo demonstrating end-to-end pipeline (bash → vte → regex → broadcast → cross-PTY injection)
 
 ### ✅ Phase 2a — Headless Terminal Grid (COMPLETE)
 
