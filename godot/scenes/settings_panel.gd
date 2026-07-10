@@ -18,10 +18,13 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 
 func _build_ui():
-	var bg = PanelContainer.new()
-	bg.custom_minimum_size = Vector2(360, 520)
-	add_child(bg)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	var cc = CenterContainer.new()
+	add_child(cc)
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var bg = Panel.new()
+	bg.custom_minimum_size = Vector2(420, 540)
+	cc.add_child(bg)
 
 	var mc = MarginContainer.new()
 	mc.add_theme_constant_override("margin_left", 16)
@@ -29,6 +32,7 @@ func _build_ui():
 	mc.add_theme_constant_override("margin_top", 16)
 	mc.add_theme_constant_override("margin_bottom", 16)
 	bg.add_child(mc)
+	mc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	var v = VBoxContainer.new(); v.name = "VBox"
 	v.add_theme_constant_override("separation", 6)
@@ -128,8 +132,7 @@ func _add_cursor_control(v: VBoxContainer) -> OptionButton:
 	var hs = HBoxContainer.new()
 	hs.add_child(_lbl("Cursor:"))
 	var opt = OptionButton.new(); opt.name = "ShapeOpt"
-	opt.add_theme_font_size_override("font_size", 12)
-	opt.add_item("Block"); opt.add_item("Underline"); opt.add_item("Beam")
+	opt.add_item("Block (█)"); opt.add_item("Underline (_)"); opt.add_item("Beam (|)")
 	opt.selected = SettingsManager.cfg_cursor_shape
 	hs.add_child(opt)
 	v.add_child(hs)
@@ -274,19 +277,19 @@ func _add_color_section(v: VBoxContainer) -> Array:
 
 func _add_cursor_thickness_control(v: VBoxContainer) -> Array:
 	var hc = HBoxContainer.new()
-	hc.add_child(_lbl("Cursor px:"))
+	hc.add_child(_lbl("Thickness:"))
 	var bspin = SpinBox.new()
 	bspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	bspin.min_value = 1; bspin.max_value = 8
 	bspin.value = SettingsManager.cfg_beam_width
 	hc.add_child(bspin)
-	hc.add_child(_lbl("beam"))
+	hc.add_child(_lbl("px Beam (|)  "))
 	var uspin = SpinBox.new()
 	uspin.get_line_edit().add_theme_font_size_override("font_size", 12)
 	uspin.min_value = 1; uspin.max_value = 8
 	uspin.value = SettingsManager.cfg_underline_height
 	hc.add_child(uspin)
-	hc.add_child(_lbl("underline"))
+	hc.add_child(_lbl("px Underline (_)"))
 	v.add_child(hc)
 	return [bspin, uspin]
 
