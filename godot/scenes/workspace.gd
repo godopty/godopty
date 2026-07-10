@@ -548,6 +548,7 @@ func _apply_settings_to(body: Control):
 	body.color_scheme_path = _cfg_color_scheme_path
 	body.font_path = _cfg_font_path
 	body.font_size = _cfg_font_size
+		body.max_fps = _cfg_max_fps
 
 # ═══════════════════════════════════════════════════════════════════════
 # Settings panel

@@ -50,6 +50,12 @@ var color_scheme_path: String = ""
 @export var default_fg: Color = Color(0.8, 0.8, 0.8)
 @export var default_bg: Color = Color(0.12, 0.12, 0.12)
 
+@export var max_fps: int = 0:
+	set(value):
+		max_fps = value
+		var target = max_fps if max_fps > 0 else (DisplayServer.screen_get_refresh_rate() if DisplayServer.screen_get_refresh_rate() > 0 else 60.0)
+		_sync_interval = 1.0 / target
+
 var _terminal: GodoptyTerminal
 var _font: Font
 var _font_bold: Font
@@ -71,7 +77,7 @@ var _resize_pending: bool = false
 var _resize_timer: float = 0.0
 const RESIZE_DEBOUNCE = 0.05
 var _time_since_sync: float = 0.0
-const SYNC_INTERVAL = 1.0 / 60.0
+var _sync_interval: float = 1.0 / 60.0
 
 func _ready():
 	_terminal = GodoptyTerminal.new()
@@ -153,7 +159,7 @@ func _process(delta):
 			_terminal.resize_grid(rows, cols)
 
 	_time_since_sync += delta
-	if _time_since_sync >= SYNC_INTERVAL:
+	if _time_since_sync >= _sync_interval:
 		_time_since_sync = 0.0
 		var gen = _terminal.get_grid_generation()
 		if gen != _last_grid_gen:
