@@ -51,10 +51,10 @@ func _show_next():
 		ToastManager.ERROR:
 			lbl.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
 
+	add_child(lbl)
 	lbl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	lbl.offset_top = -40
 	lbl.offset_bottom = 0
-	add_child(lbl)
 
 	_current_label = lbl
 	var duration: float = data.get("duration", 3.0)
