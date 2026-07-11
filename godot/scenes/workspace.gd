@@ -101,22 +101,46 @@ func _apply_layout():
 # Spawn / Kill
 # ═══════════════════════════════════════════════════════════════════════
 
-func _spawn(shell := DEFAULT_SHELL) -> Control:
+func _spawn_internal(shell: String) -> Control:
 	var w = _build_wrapper(shell, SettingsManager.cfg_default_rows, SettingsManager.cfg_default_cols)
 	if _tiles.is_empty():
 		_tiles.append({wrapper = w, col = 0, row = 0, cspan = GRID, rspan = GRID})
 	else:
 		if not _split_for(w):
 			w.queue_free()
-			ToastManager.warn("Cannot add terminal — panes would be too small")
 			return null
 	_grid.add_child(w)
-	_apply_layout()
-	_list()
 	var body = _find_body(w)
 	body.focus_entered.connect(func(): _last_body = body)
+	return body
+
+func _spawn(shell := DEFAULT_SHELL) -> Control:
+	var body = _spawn_internal(shell)
+	if body == null:
+		ToastManager.warn("Cannot add terminal — panes would be too small")
+		return null
+	_apply_layout()
+	_list()
 	ToastManager.info("Terminal spawned")
 	return body
+
+func _spawn_bulk(count: int, shell := DEFAULT_SHELL):
+	var spawned = 0
+	var last_body: Control = null
+	for i in count:
+		var body = _spawn_internal(shell)
+		if body == null:
+			break
+		last_body = body
+		spawned += 1
+	
+	if spawned > 0:
+		_apply_layout()
+		_list()
+		ToastManager.info("Spawned %d terminals" % spawned)
+		if last_body: last_body.grab_focus()
+	else:
+		ToastManager.warn("Cannot add terminals — grid is full")
 
 func _split_for(w: Control) -> bool:
 	var bi = 0; var ba = 0
@@ -303,6 +327,7 @@ func _build_sidebar():
 	add_child(_sidebar)
 	_sidebar.build(_sidebar_bg)
 	_sidebar.request_new_pane.connect(func(): var p = _spawn(); if p: p.grab_focus())
+	_sidebar.request_bulk_spawn.connect(func(c): _spawn_bulk(c))
 	_sidebar.request_close_last.connect(_kill_last)
 	_sidebar.request_close.connect(_kill)
 	_sidebar.request_settings.connect(_open_settings)

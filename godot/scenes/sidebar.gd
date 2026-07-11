@@ -2,6 +2,7 @@ extends Control
 class_name Sidebar
 
 signal request_new_pane
+signal request_bulk_spawn(count: int)
 signal request_close_last
 signal request_close(body: Control)
 signal request_settings
@@ -79,6 +80,7 @@ func _add_fps(v: VBoxContainer):
 func _add_buttons(v: VBoxContainer):
 	for b in [
 		["+ Terminal", func(): request_new_pane.emit()],
+		["+ 16 Terminals", func(): request_bulk_spawn.emit(16)],
 		["⚙ Settings", func(): request_settings.emit()],
 		["↺ Reset", func(): request_reset.emit()],
 	]:
