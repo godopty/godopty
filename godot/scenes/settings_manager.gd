@@ -26,6 +26,8 @@ var cfg_color_scheme_path := ""
 var cfg_max_fps := 0
 var cfg_font_path := "res://fonts/DejaVuSansMono.ttf"
 var cfg_font_size := 14
+var cfg_shell_command := "/bin/bash"
+var cfg_shell_env := ""
 
 signal settings_changed
 
@@ -59,9 +61,11 @@ func load_settings():
 		cfg_max_fps = d.get("max_fps", 0)
 		cfg_font_path = d.get("font_path", "res://fonts/DejaVuSansMono.ttf")
 		cfg_font_size = d.get("font_size", 14)
+		cfg_shell_command = d.get("shell_command", "/bin/bash")
+		cfg_shell_env = d.get("shell_env", "")
 
 func save_settings():
-	var d = {"cursor_shape": cfg_cursor_shape, "cursor_blink": cfg_cursor_blink, "cursor_blink_speed": cfg_cursor_blink_speed, "scroll_lines": cfg_scroll_lines, "default_rows": cfg_default_rows, "default_cols": cfg_default_cols, "beam_width": cfg_beam_width, "underline_height": cfg_underline_height, "wrapper_bg": cfg_wrapper_bg.to_html(), "title_bar_bg": cfg_title_bar_bg.to_html(), "wrapper_border": cfg_wrapper_border.to_html(), "sidebar_bg": cfg_sidebar_bg.to_html(), "focus_border": cfg_focus_border.to_html(), "selection": cfg_selection.to_html(), "scrollback_indicator": cfg_scrollback_indicator.to_html(), "color_scheme": cfg_color_scheme_path, "max_fps": cfg_max_fps, "font_path": cfg_font_path, "font_size": cfg_font_size}
+	var d = {"cursor_shape": cfg_cursor_shape, "cursor_blink": cfg_cursor_blink, "cursor_blink_speed": cfg_cursor_blink_speed, "scroll_lines": cfg_scroll_lines, "default_rows": cfg_default_rows, "default_cols": cfg_default_cols, "beam_width": cfg_beam_width, "underline_height": cfg_underline_height, "wrapper_bg": cfg_wrapper_bg.to_html(), "title_bar_bg": cfg_title_bar_bg.to_html(), "wrapper_border": cfg_wrapper_border.to_html(), "sidebar_bg": cfg_sidebar_bg.to_html(), "focus_border": cfg_focus_border.to_html(), "selection": cfg_selection.to_html(), "scrollback_indicator": cfg_scrollback_indicator.to_html(), "color_scheme": cfg_color_scheme_path, "max_fps": cfg_max_fps, "font_path": cfg_font_path, "font_size": cfg_font_size, "shell_command": cfg_shell_command, "shell_env": cfg_shell_env}
 	var f = FileAccess.open(SETTINGS_FILE, FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d))
 	settings_changed.emit()
@@ -82,6 +86,8 @@ func apply_to_terminal(body: Control):
 	body.font_path = cfg_font_path
 	body.font_size = cfg_font_size
 	body.max_fps = cfg_max_fps
+	body.shell_command = cfg_shell_command
+	body.shell_env = cfg_shell_env
 
 func _color_from_hex(hex: String, fallback: Color) -> Color:
 	if hex == "": return fallback

@@ -15,6 +15,8 @@ const SCROLLBACK_INDICATOR_COLOR = Color.YELLOW
 const BEAM_CURSOR_WIDTH = 2
 const UNDERLINE_CURSOR_HEIGHT = 3
 const PRINTABLE_ASCII_MIN = 32
+const SEARCH_HIGHLIGHT_COLOR = Color(1.0, 0.8, 0.0, 0.35)
+const SEARCH_ACTIVE_COLOR = Color(1.0, 0.5, 0.0, 0.5)
 const PRINTABLE_ASCII_MAX = 126
 
 @export var beam_cursor_width: int = BEAM_CURSOR_WIDTH
@@ -25,6 +27,7 @@ const PRINTABLE_ASCII_MAX = 126
 var color_scheme_path: String = ""
 
 @export var shell_command: String = "/bin/bash"
+@export var shell_env := ""
 @export var rows: int = 24
 @export var cols: int = 80
 @export var font_size: int = 14:
@@ -77,6 +80,10 @@ var _resize_pending: bool = false
 var _resize_timer: float = 0.0
 const RESIZE_DEBOUNCE = 0.05
 var _time_since_sync: float = 0.0
+var _search_bar: LineEdit
+var _search_visible: bool = false
+var _search_results: Dictionary = {}  # {count, rows: Array, cols: Array, current: int}
+var _search_error: String = ""
 var _sync_interval: float = 1.0 / 60.0
 
 func _ready():
@@ -84,7 +91,7 @@ func _ready():
 	_terminal = GodoptyTerminal.new()
 	_terminal.name = "GodoptyTerminal"
 	add_child(_terminal)
-	_terminal.start_shell(shell_command, rows, cols)
+	_terminal.start_shell(shell_command, rows, cols, shell_env)
 
 	if color_scheme_path != "":
 		_apply_stored_scheme()
@@ -97,6 +104,19 @@ func _ready():
 
 	focus_mode = Control.FOCUS_CLICK
 	clip_contents = true
+
+	# Search bar (hidden by default)
+	_search_bar = LineEdit.new()
+	_search_bar.name = "SearchBar"
+	_search_bar.placeholder_text = "Search (regex)..."
+	_search_bar.visible = false
+	_search_bar.anchor_left = 0.0; _search_bar.anchor_right = 1.0
+	_search_bar.anchor_bottom = 1.0; _search_bar.offset_bottom = 0
+	_search_bar.offset_top = -36
+	_search_bar.text_changed.connect(_on_search_text_changed)
+	_search_bar.text_submitted.connect(_on_search_submitted)
+	_search_bar.gui_input.connect(_on_search_bar_input)
+	add_child(_search_bar)
 
 func _on_resize():
 	if _terminal == null or _cell_w == 0: return
@@ -167,22 +187,22 @@ func _process(delta):
 			_last_grid_gen = gen
 			var t0 = Time.get_ticks_msec()
 			# Damage tracking: fetch only modified cells unless the cache is empty (force full pack)
-			var updates = _terminal.get_grid_updates(_cell_cache.is_empty())
+			var updates = _terminal.get_grid_updates_packed(_cell_cache.is_empty())
 			if updates.get("is_full", true):
 				# Full grid sync (e.g. initial load, resize, or massive scroll)
 				_cell_cache = updates
 			else:
 				# Partial sync: incrementally merge damaged cells into existing arrays
-				var indices: Array = updates["indices"]
+				var indices: PackedInt32Array = updates["indices"]
 				var chars: Array = updates["chars"]
-				var fg: Array = updates["fg"]
-				var bg: Array = updates["bg"]
-				var attrs: Array = updates["attrs"]
+				var fg: PackedColorArray = updates["fg"]
+				var bg: PackedColorArray = updates["bg"]
+				var attrs: PackedInt32Array = updates["attrs"]
 				var cols: int = _cell_cache["cols"]
 				var cc_chars: Array = _cell_cache["chars"]
-				var cc_fg: Array = _cell_cache["fg"]
-				var cc_bg: Array = _cell_cache["bg"]
-				var cc_attrs: Array = _cell_cache["attrs"]
+				var cc_fg: PackedColorArray = _cell_cache["fg"]
+				var cc_bg: PackedColorArray = _cell_cache["bg"]
+				var cc_attrs: PackedInt32Array = _cell_cache["attrs"]
 				for i in indices.size():
 					var idx: int = indices[i]
 					var r: int = idx / cols
@@ -238,6 +258,9 @@ func _draw():
 	# Selection
 	if _sel_start.x >= 0 and _sel_end.x >= 0:
 		_draw_selection(off)
+
+	# Search highlights
+	_draw_search_highlights(off)
 	_draw_ms = Time.get_ticks_msec() - t0
 
 func _draw_cells(off: Vector2, baseline: float):
@@ -245,23 +268,40 @@ func _draw_cells(off: Vector2, baseline: float):
 	if grid.is_empty(): return
 	var n_rows: int = grid["rows"]; var n_cols: int = grid["cols"]
 	var chars: Array = grid["chars"]
-	var fg_arr: Array = grid["fg"]; var bg_arr: Array = grid["bg"]
-	var attrs: Array = grid["attrs"]
+	var fg_arr: PackedColorArray = grid["fg"]; var bg_arr: PackedColorArray = grid["bg"]
+	var attrs: PackedInt32Array = grid["attrs"]
+
+	# ── Step C: Batched backgrounds ──
+	# Collapse ~n_rows×n_cols draw_rect calls into ~50 by merging
+	# consecutive cells with the same background color.
 	for r in n_rows:
-		var skip_next = false
+		var c: int = 0
+		while c < n_cols:
+			var idx: int = r * n_cols + c
+			var bg: Color = bg_arr[idx] as Color
+			var start_c: int = c
+			c += 1
+			while c < n_cols:
+				var next_bg: Color = bg_arr[r * n_cols + c] as Color
+				if next_bg != bg: break
+				c += 1
+			# One rect for the entire run of same-background cells
+			draw_rect(Rect2(off.x + start_c * _cell_w, off.y + r * _cell_h, (c - start_c) * _cell_w, _cell_h), bg)
+
+	# ── Full text + underline pass ──
+	var skip_next = false
+	for r in n_rows:
+		skip_next = false
 		for c in n_cols:
 			if skip_next:
 				skip_next = false
 				continue
 			var idx = r * n_cols + c
 			var ch: String = chars[r][c]
-			var fg = fg_arr[idx] as Color
-			var bg = bg_arr[idx] as Color
+			var fg: Color = fg_arr[idx] as Color
 			var a: int = attrs[idx]
 			if a & 16 != 0: skip_next = true
-			if a & 8 != 0: var tmp = fg; fg = bg; bg = tmp
-
-			draw_rect(Rect2(off.x + c * _cell_w, off.y + r * _cell_h, _cell_w, _cell_h), bg)
+			if a & 8 != 0: var tmp = fg; fg = bg_arr[idx] as Color
 
 			if ch != " " and ch != "":
 				var uf = _font
@@ -269,9 +309,8 @@ func _draw_cells(off: Vector2, baseline: float):
 				if a & 2 != 0: uf = _font_italic
 				draw_string(uf, Vector2(off.x + c * _cell_w, off.y + r * _cell_h + baseline), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, fg)
 
-			if a & 4 != 0:
+			if a & 4 != 0:  # underline
 				draw_line(Vector2(off.x + c * _cell_w, off.y + r * _cell_h + baseline + 2), Vector2(off.x + (c + 1) * _cell_w, off.y + r * _cell_h + baseline + 2), fg, 1.0)
-
 func _draw_cursor(off: Vector2, baseline: float):
 	var cr = _terminal.get_cursor_row(); var cc = _terminal.get_cursor_col()
 	if cr < 0 or cc < 0: return
@@ -341,6 +380,9 @@ func _handle_mouse(event: InputEvent):
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				if event.ctrl_pressed:
+					_check_click_concept(event.position)
+					accept_event(); return
 				grab_focus(); _selecting = true
 				_sel_start = _mouse_to_cell(event.position); _sel_end = _sel_start; queue_redraw()
 			else: _selecting = false; queue_redraw()
@@ -348,8 +390,15 @@ func _handle_mouse(event: InputEvent):
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed: _terminal.scroll_down(scroll_lines)
 	if event is InputEventMouseMotion and _selecting:
 		_sel_end = _mouse_to_cell(event.position); queue_redraw()
-
 func _handle_keyboard(event: InputEventKey):
+	# Search bar escape — close search
+	if _search_visible and event.keycode == KEY_ESCAPE:
+		_close_search()
+		accept_event(); return
+	# Ctrl+F toggles search bar
+	if event.keycode == KEY_F and event.ctrl_pressed:
+		_toggle_search()
+		accept_event(); return
 	if event.keycode == KEY_C and event.ctrl_pressed and event.shift_pressed:
 		var st = _get_selected_text()
 		if st != "": DisplayServer.clipboard_set(st)
@@ -364,6 +413,12 @@ func _handle_keyboard(event: InputEventKey):
 	if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 		_terminal.send_line(""); _terminal.scroll_reset(); accept_event(); return
 	_terminal.scroll_reset()
+	# Try Rust keymap first (arrows, F-keys, Home, End, etc.)
+	var bytes = _terminal.key_to_bytes(event.keycode, event.shift_pressed, event.alt_pressed, event.ctrl_pressed, event.meta_pressed)
+	if bytes.size() > 0:
+		_terminal.send_text(bytes.get_string_from_ascii())
+		accept_event(); return
+	# Fall back to unicode + Ctrl+letter path
 	var tx = _key_to_text(event)
 	if tx != "": _terminal.send_text(tx); accept_event()
 
@@ -372,18 +427,133 @@ func _mouse_to_cell(pos: Vector2) -> Vector2i:
 	return Vector2i(int((pos.x - off.x) / _cell_w), int((pos.y - off.y) / _cell_h))
 
 func _key_to_text(event: InputEventKey) -> String:
+	# Ctrl+letter → ASCII control character
 	if event.ctrl_pressed and event.keycode >= KEY_A and event.keycode <= KEY_Z:
 		return char(event.keycode - KEY_A + 1)
-	if event.unicode >= 32 and event.unicode != 127: return char(event.unicode)
-	match event.keycode:
-		KEY_BACKSPACE: return "\u007f"
-		KEY_TAB: return "\t"
-		KEY_ESCAPE: return "\u001b"
-		KEY_UP: return "\u001b[A"
-		KEY_DOWN: return "\u001b[B"
-		KEY_RIGHT: return "\u001b[C"
-		KEY_LEFT: return "\u001b[D"
-		KEY_HOME: return "\u001b[H"
-		KEY_END: return "\u001b[F"
-		KEY_DELETE: return "\u001b[3~"
+	# Printable unicode (handled by keymap if it was a special key)
+	if event.unicode >= 32 and event.unicode != 127:
+		return char(event.unicode)
 	return ""
+func _on_search_bar_input(event):
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_close_search()
+		_search_bar.accept_event()
+		return
+
+func _toggle_search():
+	_search_visible = not _search_visible
+	_search_bar.visible = _search_visible
+	if _search_visible:
+		_search_bar.grab_focus()
+		_search_bar.select_all()
+	else:
+		_search_results.clear()
+		_search_error = ""
+		queue_redraw()
+
+func _close_search():
+	_search_visible = false
+	_search_bar.visible = false
+	_search_results.clear()
+	_search_error = ""
+	queue_redraw()
+	grab_focus()
+
+func _on_search_text_changed(new_text: String):
+	_do_search(new_text)
+
+func _on_search_submitted(new_text: String):
+	if _search_results.get("count", 0) > 0:
+		_jump_to_match(1)  # next match
+
+func _do_search(pattern: String):
+	if pattern == "":
+		_search_results.clear()
+		_search_error = ""
+		queue_redraw()
+		return
+	var result = _terminal.search_grid(pattern)
+	if result.has("error"):
+		_search_error = result["error"]
+		_search_results.clear()
+	else:
+		_search_error = ""
+		_search_results = result
+		_search_results["current"] = -1
+	queue_redraw()
+
+func _jump_to_match(direction: int):
+	var count: int = _search_results.get("count", 0)
+	if count == 0: return
+	var rows_arr: Array = _search_results["rows"]
+	var current: int = _search_results.get("current", -1)
+	current = (current + direction) % count
+	if current < 0: current = count - 1
+	_search_results["current"] = current
+
+	# Scroll to center the matched line in the viewport
+	var match_row: int = rows_arr[current]
+	var history: int = _terminal.get_history_size()
+	var target_offset: int = clampi(history - match_row + rows / 2, 0, history)
+	var cur_offset: int = _terminal.get_scroll_offset()
+	var delta: int = target_offset - cur_offset
+	if delta > 0:
+		_terminal.scroll_up(delta)
+	elif delta < 0:
+		_terminal.scroll_down(-delta)
+	queue_redraw()
+
+func _draw_search_highlights(off: Vector2):
+	if _search_results.is_empty(): return
+	var count: int = _search_results.get("count", 0)
+	if count == 0: return
+	var rows_arr: Array = _search_results["rows"]
+	var cols_arr: Array = _search_results["cols"]
+	var current: int = _search_results.get("current", -1)
+	var history: int = _terminal.get_history_size()
+	var display_offset: int = _terminal.get_scroll_offset()
+	var n_cols: int = _cell_cache.get("cols", 0)
+
+	for i in count:
+		var match_row: int = rows_arr[i]
+		# Convert from scrollback-relative to display-relative
+		# match_row=0 means top of scrollback = Line(-history)
+		# Display top = Line(-display_offset)
+		var display_row: int = match_row - (history - display_offset)
+		if display_row < 0 or display_row >= rows: continue
+		var match_col: int = cols_arr[i]
+		if match_col < 0 or match_col >= n_cols: continue
+		var color = SEARCH_ACTIVE_COLOR if i == current else SEARCH_HIGHLIGHT_COLOR
+		draw_rect(Rect2(off.x + match_col * _cell_w, off.y + display_row * _cell_h, _cell_w, _cell_h), color)
+
+# ── Clickable concepts ────────────────────────────────────────────────
+
+func _check_click_concept(pos: Vector2):
+	var cell = _mouse_to_cell(pos)
+	var r = cell.y; var c = cell.x
+	if r < 0 or c < 0: return
+	var chars: Array = _cell_cache.get("chars", [])
+	if r >= chars.size(): return
+	var row_str: String = chars[r]
+	if c >= row_str.length(): return
+	# Trim trailing spaces to get the meaningful text
+	var line = row_str.strip_edges(false, true)
+	if line == "": return
+	# Ask the terminal to check if any concept triggers on this line
+	var concepts = _terminal.get_global_concepts()
+	for concept in concepts:
+		var trigger: String = concept.get("trigger", "")
+		if trigger == "": continue
+		var re = RegEx.new()
+		if re.compile(trigger) != OK: continue
+		var result = re.search(line)
+		if result:
+			var actions = concept.get("actions", [])
+			if actions.size() > 0:
+				var cmd: String = actions[0].get("cmd", "")
+				if cmd != "":
+					cmd = cmd.replace("{payload}", result.get_string())
+					for gi in result.get_group_count():
+						cmd = cmd.replace("{%d}" % gi, result.get_string(gi))
+					_terminal.send_line(cmd)
+			return

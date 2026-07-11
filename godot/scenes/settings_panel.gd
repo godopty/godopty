@@ -54,6 +54,9 @@ func _build_ui():
 	t_term.add_child(HSeparator.new())
 	var dims = _add_dims_control(t_term)
 	var scroll_spin = _add_scroll_control(t_term)
+	t_term.add_child(HSeparator.new())
+	var shell_le = _add_shell_control(t_term)
+	var env_te = _add_env_control(t_term)
 
 	# Tab 2: Appearance
 	var t_app = _create_tab(tabs, "Appearance")
@@ -67,6 +70,10 @@ func _build_ui():
 	# Tab 3: System
 	var t_sys = _create_tab(tabs, "System")
 	_add_fps_control(t_sys)
+
+	# Tab 4: Concepts
+	var t_con = _create_tab(tabs, "Concepts")
+	_add_concept_section(t_con)
 
 	v.add_child(HSeparator.new())
 
@@ -348,3 +355,122 @@ func _add_reset_button(v: VBoxContainer, shape_opt: OptionButton, blink_cb: Chec
 		fs_spin.value = 14
 	)
 	v.add_child(btn)
+
+func _add_shell_control(v: VBoxContainer) -> LineEdit:
+	var h = HBoxContainer.new()
+	h.add_child(_lbl("Shell:"))
+	var le = LineEdit.new()
+	le.text = SettingsManager.cfg_shell_command
+	le.placeholder_text = "/bin/bash"
+	le.add_theme_font_size_override("font_size", 12)
+	le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	le.text_changed.connect(func(t: String):
+		SettingsManager.cfg_shell_command = t
+		_debounce_timer.start()
+	)
+	h.add_child(le)
+	v.add_child(h)
+	return le
+
+func _add_env_control(v: VBoxContainer) -> TextEdit:
+	v.add_child(_lbl("Environment:"))
+	var te = TextEdit.new()
+	te.text = SettingsManager.cfg_shell_env
+	te.placeholder_text = "KEY=value (one per line)"
+	te.custom_minimum_size = Vector2(0, 60)
+	te.add_theme_font_size_override("font_size", 11)
+	te.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	te.text_changed.connect(func():
+		SettingsManager.cfg_shell_env = te.text
+		_debounce_timer.start()
+	)
+	v.add_child(te)
+	return te
+
+var _concept_list: VBoxContainer
+var _concept_terminal: GodoptyTerminal  # any terminal for global concept FFI
+
+func _add_concept_section(v: VBoxContainer):
+	# Find a terminal to use for concept FFI calls
+	var bodies = _workspace.find_children("*", "TerminalPane", true, false)
+	if bodies.size() > 0:
+		_concept_terminal = bodies[0]._terminal
+	else:
+		_concept_terminal = GodoptyTerminal.new()
+
+	var add_btn = Button.new()
+	add_btn.text = "Add Concept"
+	add_btn.pressed.connect(_show_concept_dialog.bind(-1))
+	v.add_child(add_btn)
+
+	_concept_list = VBoxContainer.new()
+	v.add_child(_concept_list)
+	_refresh_concept_list()
+
+func _refresh_concept_list():
+	for c in _concept_list.get_children(): c.queue_free()
+	var concepts = _concept_terminal.get_global_concepts() if _concept_terminal else []
+	for i in concepts.size():
+		var c = concepts[i]
+		var h = HBoxContainer.new()
+		var lbl = Label.new()
+		lbl.text = "%s  →  %s" % [c.get("name", "?"), c.get("trigger", "?")]
+		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(lbl)
+		var edit_btn = Button.new(); edit_btn.text = "Edit"
+		edit_btn.pressed.connect(_show_concept_dialog.bind(i))
+		h.add_child(edit_btn)
+		var del_btn = Button.new(); del_btn.text = "X"
+		del_btn.pressed.connect(func(): _delete_concept(i))
+		h.add_child(del_btn)
+		_concept_list.add_child(h)
+
+func _show_concept_dialog(idx: int):
+	var dlg = AcceptDialog.new()
+	dlg.title = "Edit Concept" if idx >= 0 else "Add Concept"
+	var v = VBoxContainer.new()
+	dlg.add_child(v)
+	var name_le = LineEdit.new(); name_le.placeholder_text = "Concept name"
+	var regex_le = LineEdit.new(); regex_le.placeholder_text = "Regex trigger"
+	var cmd_le = LineEdit.new(); cmd_le.placeholder_text = "Action command"
+	var target_le = LineEdit.new(); target_le.placeholder_text = "Target label"
+	if idx >= 0 and _concept_terminal:
+		var concepts = _concept_terminal.get_global_concepts()
+		if idx < concepts.size():
+			var c = concepts[idx]
+			name_le.text = c.get("name", "")
+			regex_le.text = c.get("trigger", "")
+			var acts = c.get("actions", [])
+			if acts.size() > 0:
+				cmd_le.text = acts[0].get("cmd", "")
+				target_le.text = acts[0].get("target", "")
+	v.add_child(_lbl("Name:")); v.add_child(name_le)
+	v.add_child(_lbl("Regex:")); v.add_child(regex_le)
+	v.add_child(_lbl("Command:")); v.add_child(cmd_le)
+	v.add_child(_lbl("Target:")); v.add_child(target_le)
+	dlg.confirmed.connect(func():
+		_save_concept(idx, name_le.text, regex_le.text, cmd_le.text, target_le.text)
+		dlg.queue_free()
+	)
+	add_child(dlg)
+	dlg.popup_centered()
+
+func _save_concept(idx: int, name: String, regex_pat: String, cmd: String, target: String):
+	if not _concept_terminal: return
+	var concepts = _concept_terminal.get_global_concepts()
+	var entry = {"name": name, "trigger": regex_pat, "actions": [{"cmd": cmd, "target": target}]}
+	if idx >= 0 and idx < concepts.size():
+		concepts[idx] = entry
+	else:
+		concepts.append(entry)
+	_concept_terminal.set_global_concepts(concepts)
+	_refresh_concept_list()
+
+func _delete_concept(idx: int):
+	if not _concept_terminal: return
+	var concepts = _concept_terminal.get_global_concepts()
+	if idx >= 0 and idx < concepts.size():
+		concepts.remove_at(idx)
+		_concept_terminal.set_global_concepts(concepts)
+		_refresh_concept_list()
