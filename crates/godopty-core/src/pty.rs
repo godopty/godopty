@@ -33,12 +33,17 @@ impl PtyHandle {
     /// Spawn a shell process in a new PTY and start a reader thread.
     /// Output bytes are sent to `tx` as `Vec<u8>` chunks.
     pub fn spawn(
-        id: u32, command: &str, args: &[&str], tx: UnboundedSender<Vec<u8>>,
+        id: u32, command: &str, args: &[&str], envs: &[String], tx: UnboundedSender<Vec<u8>>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let pty_system = native_pty_system();
         let mut cmd = CommandBuilder::new(command);
         cmd.args(args);
         cmd.env("TERM", "xterm-256color");
+        for e in envs {
+            if let Some((k, v)) = e.split_once('=') {
+                cmd.env(k.trim(), v.trim());
+            }
+        }
 
         let pty_pair = pty_system.openpty(PtySize {
             rows: DEFAULT_ROWS, cols: DEFAULT_COLS, pixel_width: 0, pixel_height: 0,

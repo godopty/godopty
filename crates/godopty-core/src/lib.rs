@@ -36,3 +36,5 @@ pub mod pty;
 pub mod parser;
 pub mod term;
 pub mod color;
+pub mod keymap;
+pub mod history;

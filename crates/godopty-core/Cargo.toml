@@ -11,3 +11,4 @@ portable-pty = "0.9"
 vte = "0.15"
 log = "0.4"
 alacritty_terminal = "0.26.0"
+rusqlite = { version = "0.31", features = ["bundled"] }

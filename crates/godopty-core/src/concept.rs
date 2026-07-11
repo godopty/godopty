@@ -24,15 +24,18 @@ pub fn match_and_broadcast(
     line: &str,
 ) {
     for concept in concepts {
-        if concept.trigger_regex.is_match(line) {
+        if let Some(caps) = concept.trigger_regex.captures(line) {
+            let mut captures = Vec::with_capacity(caps.len());
+            for c in caps.iter() {
+                captures.push(c.map(|m| m.as_str().to_string()).unwrap_or_default());
+            }
             let ev = Event {
                 topic: concept.name.clone(),
                 payload: line.to_string(),
                 source_pane: source_id,
+                captures,
             };
             log::info!("[Pane {source_id}] Broadcasting event: {:?}", ev.topic);
-            // Ignore send errors — if no receivers are active, the event is
-            // simply dropped. This is expected during shutdown.
             let _ = tx.send(ev);
         }
     }
@@ -58,12 +61,23 @@ pub fn matching_commands(
     if event.source_pane == my_id {
         return Vec::new();
     }
-
     let mut commands = Vec::new();
     for concept in concepts.iter().filter(|c| c.name == event.topic) {
         for action in &concept.destinations {
             if my_labels.contains(&action.target_label) {
-                commands.push(action.command_template.clone());
+                let mut cmd = action.command_template.clone();
+                // Protect literal {{ with placeholder, then restore after
+                let ph = "\x00OB\x00";
+                cmd = cmd.replace("{{", ph);
+                cmd = cmd.replace("{payload}", &event.payload);
+                for (i, cap) in event.captures.iter().enumerate() {
+                    cmd = cmd.replace(&format!("{{{i}}}"), cap);
+                }
+                // Clear remaining {N} for missing capture groups
+                let re = regex::Regex::new(r"\{\d+\}").unwrap();
+                cmd = re.replace_all(&cmd, "").to_string();
+                cmd = cmd.replace(ph, "{");
+                commands.push(cmd);
             }
         }
     }
@@ -92,7 +106,7 @@ mod tests {
     }
 
     fn make_event(topic: &str, source: u32) -> Event {
-        Event { topic: topic.into(), payload: "test".into(), source_pane: source }
+        Event { topic: topic.into(), payload: "test".into(), source_pane: source, captures: vec![] }
     }
 
     // ── matching_commands ──────────────────────────────────────────

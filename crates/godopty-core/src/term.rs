@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex};
 
 use alacritty_terminal::event::{Event as TermEvent, EventListener};
 use alacritty_terminal::grid::{Dimensions, Grid, Scroll};
+use alacritty_terminal::index::{Column, Line};
 use alacritty_terminal::term::cell::Cell;
 use alacritty_terminal::term::cell::Flags;
 use alacritty_terminal::term::Config;
@@ -107,11 +108,12 @@ pub struct TermGrid {
     title: Arc<Mutex<String>>,
     rows: usize,
     cols: usize,
-    /// Incremented on every feed() and resize(); used by Godot to
-    /// skip redundant grid fetches when nothing changed.
     pub generation: u64,
-    /// Current 16-color palette (ANSI 0-15). Defaults to standard xterm colors.
     pub palette: [[u8; 3]; 16],
+    /// Line counter for history storage (monotonically increasing).
+    line_count: u64,
+    /// Optional SQLite-backed history store for persistent scrollback.
+    pub history: Option<Arc<std::sync::Mutex<crate::history::HistoryStore>>>,
 }
 
 impl TermGrid {
@@ -127,7 +129,7 @@ impl TermGrid {
         let term = Term::new(config, &size, listener);
         let processor = vte::ansi::Processor::new();
 
-        Self { term, processor, title, rows, cols, generation: 0, palette: crate::color::SYSTEM_COLORS }
+        Self { term, processor, title, rows, cols, generation: 0, palette: crate::color::SYSTEM_COLORS, line_count: 0, history: None }
     }
 
     /// Feed raw PTY output bytes into the terminal state machine.
@@ -292,6 +294,46 @@ impl TermGrid {
         self.term.grid_mut().scroll_display(Scroll::Bottom);
         self.generation += 1;
     }
+
+	/// Store a completed output line in the optional SQLite history.
+	pub fn store_line(&mut self, line: &str) {
+		self.line_count += 1;
+		if let Some(ref history) = self.history {
+			if let Ok(h) = history.lock() {
+				let _ = h.append(self.line_count as i64, line);
+			}
+		}
+	}
+	/// Search the full grid (scrollback + visible) for lines matching `pattern`.
+	///
+	/// Returns a list of `(line_idx, col)` positions. `line_idx` is 0-based
+	/// from the top of scrollback history (0 = oldest history line).
+	/// `col` is the byte offset of the match within the line's text.
+	///
+	/// Uses the standard `regex` crate — no backtracking engine, ReDoS-safe.
+	pub fn search(&self, pattern: &str) -> Result<Vec<(i32, i32)>, regex::Error> {
+		let re = regex::Regex::new(pattern)?;
+		let grid = self.term.grid();
+		let history = grid.history_size() as i32;
+		let screen = grid.screen_lines() as i32;
+		let mut results = Vec::new();
+
+		// Grid uses negative Line for scrollback: Line(-history) .. Line(screen-1)
+		for raw_line in -history..screen {
+			let row = &grid[Line(raw_line)];
+			let mut text = String::with_capacity(self.cols);
+			for col in 0..self.cols {
+				text.push(row[Column(col)].c);
+			}
+			// Trim trailing spaces — terminal lines are space-padded to width
+			let trimmed_len = text.trim_end().len();
+			for m in re.find_iter(&text[..trimmed_len]) {
+				// Report line as 0-based from top of scrollback
+				results.push(((raw_line + history) as i32, m.start() as i32));
+			}
+		}
+		Ok(results)
+	}
 }
 
 // ── CellInfo helpers ───────────────────────────────────────────────────

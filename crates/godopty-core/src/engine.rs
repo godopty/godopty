@@ -27,10 +27,9 @@ enum StdinInput {
 
 // ── Public types ──────────────────────────────────────────────────────
 
-/// The central pub-sub orchestrator.
 pub struct WorkspaceEngine {
     tx: broadcast::Sender<Event>,
-    concepts: Arc<Vec<Concept>>,
+    concepts: Arc<std::sync::RwLock<Vec<Concept>>>,
 }
 
 /// A handle to a spawned PTY terminal, allowing the caller to inject input.
@@ -71,7 +70,7 @@ pub struct SpawnedTerminal {
 impl WorkspaceEngine {
     pub fn new(concepts: Vec<Concept>) -> Self {
         let (tx, _) = broadcast::channel(1024);
-        Self { tx, concepts: Arc::new(concepts) }
+        Self { tx, concepts: Arc::new(std::sync::RwLock::new(concepts)) }
     }
 
     /// Spawn a **mock** terminal task that cycles through mock output.
@@ -95,14 +94,14 @@ impl WorkspaceEngine {
                 tokio::select! {
                     Ok(event) = rx.recv() => {
                         let commands =
-                            concept::matching_commands(id, &labels, &concepts, &event);
+                            concept::matching_commands(id, &labels, &concepts.read().unwrap(), &event);
                         for cmd in commands {
                             log::info!("[Pane {id}] Received '{:?}'. Would execute: {cmd}", event.topic);
                         }
                     }
                     _ = interval.tick() => {
                         if let Some(line) = mock_outputs.get(idx) {
-                            concept::match_and_broadcast(id, &concepts, &tx, line);
+                            concept::match_and_broadcast(id, &concepts.read().unwrap(), &tx, line);
                             idx = (idx + 1) % mock_outputs.len();
                         }
                     }
@@ -119,7 +118,7 @@ impl WorkspaceEngine {
         args: &[&str],
     ) -> Result<PtyTerminalHandle, Box<dyn std::error::Error + Send + Sync>> {
         let (pty_tx, pty_rx) = mpsc::unbounded_channel::<Vec<u8>>();
-        let pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, pty_tx)?;
+        let pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, &[], pty_tx)?;
         let (stdin_tx, stdin_rx) = mpsc::unbounded_channel::<StdinInput>();
 
         let task_ctx = TaskContext {
@@ -141,11 +140,12 @@ impl WorkspaceEngine {
         config: TerminalConfig,
         command: &str,
         args: &[&str],
+        envs: &[String],
         rows: usize,
         cols: usize,
     ) -> Result<SpawnedTerminal, Box<dyn std::error::Error + Send + Sync>> {
         let (pty_tx, pty_rx) = mpsc::unbounded_channel::<Vec<u8>>();
-        let pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, pty_tx)?;
+        let pty_handle = crate::pty::PtyHandle::spawn(config.id, command, args, envs, pty_tx)?;
         let (stdin_tx, stdin_rx) = mpsc::unbounded_channel::<StdinInput>();
 
         let grid = Arc::new(Mutex::new(TermGrid::new(rows, cols)));
@@ -165,6 +165,21 @@ impl WorkspaceEngine {
 
         Ok(SpawnedTerminal { handle: PtyTerminalHandle { id: config.id, stdin_tx }, grid, _task: task })
     }
+
+    /// Replace the global concept list at runtime.
+    ///
+    /// Existing terminals will pick up the new concepts on their next
+    /// output line or event. New terminals spawn with the updated list.
+    pub fn set_concepts(&self, concepts: Vec<Concept>) {
+        if let Ok(mut w) = self.concepts.write() {
+            *w = concepts;
+        }
+    }
+
+    /// Return a snapshot of the current concept list.
+    pub fn get_concepts(&self) -> Vec<Concept> {
+        self.concepts.read().map(|c| c.clone()).unwrap_or_default()
+    }
 }
 
 // ── Shared terminal task ──────────────────────────────────────────────
@@ -173,7 +188,7 @@ impl WorkspaceEngine {
 struct TaskContext {
     id: u32,
     labels: Vec<String>,
-    concepts: Arc<Vec<Concept>>,
+    concepts: Arc<std::sync::RwLock<Vec<Concept>>>,
     rx: broadcast::Receiver<Event>,
     tx: broadcast::Sender<Event>,
 }
@@ -198,7 +213,7 @@ async fn run_terminal_task(
             msg = rx.recv() => {
                 match msg {
                     Ok(event) => {
-                        let commands = concept::matching_commands(id, &labels, &concepts, &event);
+                        let commands = concept::matching_commands(id, &labels, &concepts.read().unwrap(), &event);
                         for cmd in commands {
                             let _ = pty_handle.write_line(&cmd);
                         }
@@ -213,12 +228,16 @@ async fn run_terminal_task(
             msg = pty_rx.recv() => {
                 let Some(bytes) = msg else { break; };
                 let lines = line_parser.feed(&bytes);
-                for line in lines {
-                    concept::match_and_broadcast(id, &concepts, &tx, &line);
+                for line in &lines {
+                    concept::match_and_broadcast(id, &concepts.read().unwrap(), &tx, line);
                 }
+                // Store completed lines in optional SQLite history
                 if let Some(g) = &grid {
                     if let Ok(mut locked) = g.lock() {
                         locked.feed(&bytes);
+                        for line in &lines {
+                            locked.store_line(line);
+                        }
                     }
                 }
             }
@@ -261,7 +280,7 @@ mod tests {
         #[cfg(not(windows))]
         let cmd = "sh";
 
-        let spawned = engine.spawn_terminal_with_grid(config, cmd, &[], 24, 80)
+        let spawned = engine.spawn_terminal_with_grid(config, cmd, &[], &[], 24, 80)
             .await
             .expect("Failed to spawn terminal");
         

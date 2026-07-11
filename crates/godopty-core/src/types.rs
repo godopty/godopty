@@ -21,12 +21,11 @@ pub struct TerminalConfig {
 /// The payload broadcast through the pub-sub channel when a concept triggers.
 #[derive(Debug, Clone)]
 pub struct Event {
-    /// The concept name that triggered (e.g. `"port_conflict"`).
     pub topic: String,
-    /// The exact text line that matched the trigger regex.
     pub payload: String,
-    /// Which terminal pane generated this event (used for self-reaction prevention).
     pub source_pane: u32,
+    /// Regex capture groups from the trigger match (group 0 = full match).
+    pub captures: Vec<String>,
 }
 
 /// A command to inject into a target terminal, gated by a label.
