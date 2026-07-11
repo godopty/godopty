@@ -331,6 +331,11 @@ impl GodoptyTerminal {
             }, Dictionary::<Variant, Variant>::new(),
         )
     }
+    /// Fetches grid updates incrementally using damage tracking.
+    /// If `force_full` is true (or damage triggers a full redraw), returns `is_full = true`
+    /// along with parallel arrays (`chars`, `fg`, `bg`, `attrs`) covering the entire grid.
+    /// Otherwise, returns `is_full = false` along with `indices` and modified data arrays
+    /// for only the cells that changed since the last frame.
     #[func]
     fn get_grid_updates(&self, force_full: bool) -> Dictionary<Variant, Variant> {
         self.with_grid_mut_ret(

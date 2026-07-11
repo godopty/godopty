@@ -29,8 +29,8 @@ target/debug/libgodopty_gdext.so
 | `send_line(text: String)` | void | Send a line to PTY (appends `\n`) |
 | `resize_grid(rows: int, cols: int)` | void | Resize grid + send SIGWINCH |
 | `set_palette(hex_csv: String)` | void | Load color scheme (16 hex colors, CSV) |
-| `get_grid_packed()` | `Dictionary` | Flat parallel arrays (chars/fg/bg/attrs) — no per-cell Dict overhead |
-| `get_grid_rows()` | `Array[Array[Dictionary]]` | Deprecated: per-cell Dict format (use get_grid_packed) |
+| `get_grid_updates(force_full: bool)` | `Dictionary` | Incremental damage tracking or full grid pack (`is_full`, `chars`, `fg`, `bg`, `attrs`, `indices`) |
+| `get_grid_packed()` | `Dictionary` | Deprecated: Use `get_grid_updates(true)` |
 | `get_grid_generation()` | `int` | Monotonic counter, changes on grid update |
 | `get_cursor_row()` | `int` | Cursor row (0-based, -1 if none) |
 | `get_cursor_col()` | `int` | Cursor column (0-based) |
@@ -57,5 +57,5 @@ target/debug/libgodopty_gdext.so
 ### Tips
 
 - Use `get_grid_generation()` to skip redundant `get_grid_rows()` calls when the grid is idle
-- Poll at ~10–30 FPS; `get_grid_rows()` copies the entire grid
+- The renderer uses `get_grid_updates()` to fetch only damaged cells, merging them into its `_cell_cache` (reducing FFI dictionary entries from thousands down to single digits per frame).
 - If the grid mutex is held by the background task, `get_grid_rows()` returns `[]`

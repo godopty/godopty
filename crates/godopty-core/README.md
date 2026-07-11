@@ -11,7 +11,7 @@ Library crate for the godopty multi-PTY emulator. This is the engine — all ter
 | [`engine`](src/engine.rs) | Runtime orchestrator; spawns terminal tasks on tokio | `WorkspaceEngine`, `PtyTerminalHandle` |
 | [`pty`](src/pty.rs) | Cross-platform PTY lifecycle via `portable-pty` | `PtyHandle` |
 | [`parser`](src/parser.rs) | Strips ANSI escape sequences; extracts plain-text lines | `LineParser` |
-| [`term`](src/term.rs) | Full terminal grid via `alacritty_terminal` | `TermGrid`, `CellInfo` |
+| [`term`](src/term.rs) | Full terminal grid + damage tracking via `alacritty_terminal` | `TermGrid`, `CellInfo`, `GridUpdate` |
 | [`color`](src/color.rs) | ANSI color mapping — named, indexed, true-color → RGB | `color_to_rgb()` |
 
 ## Why Flat?

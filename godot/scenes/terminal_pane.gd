@@ -166,10 +166,13 @@ func _process(delta):
 		if gen != _last_grid_gen:
 			_last_grid_gen = gen
 			var t0 = Time.get_ticks_msec()
+			# Damage tracking: fetch only modified cells unless the cache is empty (force full pack)
 			var updates = _terminal.get_grid_updates(_cell_cache.is_empty())
 			if updates.get("is_full", true):
+				# Full grid sync (e.g. initial load, resize, or massive scroll)
 				_cell_cache = updates
 			else:
+				# Partial sync: incrementally merge damaged cells into existing arrays
 				var indices: Array = updates["indices"]
 				var chars: Array = updates["chars"]
 				var fg: Array = updates["fg"]
@@ -185,6 +188,7 @@ func _process(delta):
 					var r: int = idx / cols
 					var c: int = idx % cols
 					var old_str: String = cc_chars[r]
+					# Update the packed strings natively (bypasses full array recreation)
 					cc_chars[r] = old_str.substr(0, c) + chars[i] + old_str.substr(c + 1)
 					cc_fg[idx] = fg[i]
 					cc_bg[idx] = bg[i]
