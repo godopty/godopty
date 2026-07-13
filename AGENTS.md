@@ -50,22 +50,32 @@ Key modules in `godopty-core`:
 
 ### Godot scenes (`godot/scenes/`)
 
-| File | Role |
-|---|---|
-| `workspace.gd` | **Root controller**: tile grid, layout, sidebar, profile activation, global settings panel, keyboard shortcuts |
-| `sidebar.gd` | Side panel: static action buttons, profile save/activate/delete, pane list with focus/close |
-| `terminal_manager.gd` | `TerminalManager` (RefCounted): tile lifecycle, split/kill/expand logic, wrapper + title-bar builder |
-| `terminal_pane.gd` | **Active renderer** (Control-based): inherits from Control, draws cells via `_draw()`, handles input, selection, scrollback |
-| `settings_panel.gd` | Overlay panel: cursor, font, colors, FPS, concepts, per-tab settings UI |
-| `settings_manager.gd` | Autoload: `user://settings.json` persistence, `settings_changed` signal, `apply_to_terminal()` |
-| `profile_manager.gd` | Autoload: `user://profiles.json` persistence, named terminal-layout save/load/delete |
-| `concept_manager.gd` | Autoload: `user://concepts.json` persistence; pushes to Rust `WorkspaceEngine` on startup |
-| `layout_manager.gd` | Autoload: `user://layout.json` persistence for workspace tile layout |
-| `focus_manager.gd` | Autoload: Alt+Arrow geographic pane navigation |
-| `toast_manager.gd` | Autoload: transient toast notifications (`info`, `warn`) |
-| `shortcut_manager.gd` | Autoload: extensible keyboard shortcut registry |
-| `icons.gd` | `class_name Icons` with `const` glyph strings — single source of truth for all UI icons |
-| `main.tscn` | Scene entry point |
+```
+scenes/
+├── autoloads/
+│   ├── base_persistence_manager.gd  # Shared JSON I/O base for persistence managers
+│   ├── settings_manager.gd          # user://settings.json, settings_changed signal
+│   ├── profile_manager.gd           # user://profiles.json, named layout snapshots
+│   ├── concept_manager.gd           # user://concepts.json, pushes to Rust on startup
+│   ├── layout_manager.gd            # user://layout.json, workspace tile persistence
+│   ├── focus_manager.gd             # Alt+Arrow geographic pane navigation
+│   ├── toast_manager.gd             # Transient toast notifications
+│   └── shortcut_manager.gd          # Keyboard shortcut registry (via InputMap)
+├── terminal/
+│   ├── workspace.gd                 # Root controller: tile grid, layout, sidebar, profiles
+│   ├── terminal_pane.gd             # Control-based renderer: _draw(), input, selection
+│   └── terminal_manager.gd          # Tile lifecycle, split/kill/expand, wrapper builder
+├── ui/
+│   ├── sidebar.gd                   # Side panel: buttons, profile section, pane list
+│   ├── settings_panel.gd            # Overlay panel: cursor, colors, concepts, per-tab UI
+│   ├── toast_overlay.gd             # Toast UI renderer
+│   └── icons.gd                     # Icons class with const glyph constants
+├── panes/
+│   ├── code_viewer.gd              # Read-only code viewer pane
+│   ├── file_tree.gd                # Directory listing pane
+│   └── observer_pane.gd            # AI observer output pane
+└── main.tscn                       # Scene entry point
+```
 
 ### Data flow
 
@@ -83,7 +93,8 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 - **JSON → typed arrays**: `JSON.parse()` returns untyped `Array`. Assignment to `Array[Dictionary]` fails at runtime. Always iterate and build the typed array element-by-element: `for item in raw: if item is Dictionary: typed.append(item)`.
 - **Private members**: underscore prefix (`_cell_w`, `_settings_panel`)
 - **Config vars**: `_cfg_` prefix (`_cfg_cursor_shape`)
-- **Persistence**: All persistent user data follows the same autoload pattern. Each manager: (1) `extends Node` with `PROCESS_MODE_ALWAYS`, (2) owns a `user://*.json` file, (3) `load_*()` in `_ready()`, (4) `save_*()` writes JSON + emits signal, (5) registered in `project.godot` `[autoload]`. Four managers: `SettingsManager`, `ProfileManager`, `ConceptManager`, `LayoutManager`. Never inline `FileAccess.open()` in UI code — go through the autoload.
+- **Persistence**: All persistent user data follows the same autoload pattern. Each manager extends `BasePersistenceManager`, which provides `_read_file(path)` / `_write_file(path, data)` and sets `PROCESS_MODE_ALWAYS`. Subclasses override `_on_init()` instead of `_ready()`. Four managers: `SettingsManager`, `ProfileManager`, `ConceptManager`, `LayoutManager`. Never inline `FileAccess.open()` in UI code — go through `_read_file`/`_write_file`.
+- **Directory layout**: Scripts are grouped by role: `autoloads/` (7 managers + 1 base), `terminal/` (core terminal), `ui/` (sidebar, settings, toast), `panes/` (specialty pane types). `project.godot` autoload paths and `preload()`/`load()` calls use the full `res://scenes/<dir>/<file>.gd` path.
 - **Settings pipeline**: `_cfg_*` → `_save_settings()` → `user://settings.json`. To add a new setting: (1) add `_cfg_` var, (2) add UI control, (3) add one line to `_apply_settings_to()`. `_build_wrapper()` calls it automatically — no other wiring needed.
 - **Terminal spawning**: `_build_wrapper()` is the sole entry point; all paths go through it
 - **Layout Constraints**: The tiling grid relies on Godot `Control` nodes. Prefer using Godot's built-in Size Flags (Expand/Fill) inside containers (`HBoxContainer`/`VBoxContainer`) over manual pixel math. When manual math is absolutely required (like terminal cell reflows), hook into `_notification(NOTIFICATION_RESIZED)`.

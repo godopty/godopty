@@ -99,19 +99,28 @@ godopty/
     ├── godopty.gdextension
     └── scenes/
         ├── main.tscn
-        ├── workspace.gd        # Root controller, layout, settings, sidebar, profiles
-        ├── sidebar.gd          # Side panel: buttons, profile section, pane list
-        ├── terminal_pane.gd    # Terminal renderer (Control-based)
-        ├── terminal_manager.gd # Tile lifecycle, split/kill, wrapper builder
-        ├── settings_panel.gd   # Overlay settings panel with tabs
-        ├── settings_manager.gd # Autoload: settings persistence
-        ├── profile_manager.gd  # Autoload: named layout profiles
-        ├── concept_manager.gd  # Autoload: concept persistence
-        ├── layout_manager.gd   # Autoload: workspace layout persistence
-        ├── icons.gd            # Centralized UI icon glyph constants
-        ├── focus_manager.gd    # Autoload: Alt+Arrow pane navigation
-        ├── toast_manager.gd    # Autoload: transient toast notifications
-        └── shortcut_manager.gd # Autoload: keyboard shortcut registry
+        ├── autoloads/
+        │   ├── base_persistence_manager.gd  # Shared JSON I/O base class
+        │   ├── settings_manager.gd
+        │   ├── profile_manager.gd
+        │   ├── concept_manager.gd
+        │   ├── layout_manager.gd
+        │   ├── focus_manager.gd
+        │   ├── toast_manager.gd
+        │   └── shortcut_manager.gd
+        ├── terminal/
+        │   ├── workspace.gd    # Root controller
+        │   ├── terminal_pane.gd
+        │   └── terminal_manager.gd
+        ├── ui/
+        │   ├── sidebar.gd
+        │   ├── settings_panel.gd
+        │   ├── toast_overlay.gd
+        │   └── icons.gd
+        └── panes/
+            ├── code_viewer.gd
+            ├── file_tree.gd
+            └── observer_pane.gd
 
 ---
 
