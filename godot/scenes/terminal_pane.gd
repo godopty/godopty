@@ -420,7 +420,8 @@ func _handle_keyboard(event: InputEventKey):
 		accept_event(); return
 	# Fall back to unicode + Ctrl+letter path
 	var tx = _key_to_text(event)
-	if tx != "": _terminal.send_text(tx); accept_event()
+	if tx != "": _terminal.send_text(tx)
+	accept_event()
 
 func _mouse_to_cell(pos: Vector2) -> Vector2i:
 	var off = _grid_offset()
