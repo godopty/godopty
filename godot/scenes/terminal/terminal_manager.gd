@@ -8,7 +8,7 @@ const TITLE_BAR_HEIGHT = 26
 const BUTTON_MIN_WIDTH = 22
 const BUTTON_MIN_HEIGHT = 18
 
-const TerminalPaneScript = preload("res://scenes/terminal_pane.gd")
+const TerminalPaneScript = preload("res://scenes/terminal/terminal_pane.gd")
 
 var on_close: Callable  # set by workspace to refresh layout after kill
 

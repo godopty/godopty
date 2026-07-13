@@ -34,8 +34,10 @@ func _fetch_output():
 	# Simple polling: read grid updates and append new text
 	var gen = _terminal.get_grid_generation()
 	var last_gen = -1
-	while true:
+	while is_inside_tree():
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 		var new_gen = _terminal.get_grid_generation()
 		if new_gen != last_gen:
 			last_gen = new_gen

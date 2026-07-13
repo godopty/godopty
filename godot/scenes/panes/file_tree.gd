@@ -40,9 +40,11 @@ func _populate(parent: TreeItem, path: String):
 		item.set_text(0, file_name)
 		var full = path.path_join(file_name)
 		item.set_metadata(0, full)
-		if dir.current_is_dir():
-			item.set_icon(0, preload("res://icon.svg"))
+		# TODO: add icon
+		# if dir.current_is_dir():
+			# item.set_icon(0, preload("res://icon.svg"))
 		file_name = dir.get_next()
+	dir.list_dir_end()
 
 func _get_layout_state() -> Dictionary:
 	return {"type": "file_tree", "root_path": root_path}

@@ -1,4 +1,4 @@
-extends Node
+extends BasePersistenceManager
 
 const PROFILES_FILE = "user://profiles.json"
 
@@ -6,27 +6,13 @@ var profiles: Array[Dictionary] = []
 
 signal profiles_changed
 
-func _ready():
-	process_mode = Node.PROCESS_MODE_ALWAYS
+func _on_init():
 	load_profiles()
 
 func load_profiles():
-	if not FileAccess.file_exists(PROFILES_FILE):
-		return
-	var f = FileAccess.open(PROFILES_FILE, FileAccess.READ)
-	if not f:
-		return
-	var j = JSON.new()
-	var err = j.parse(f.get_as_text())
-	if err != OK:
-		push_warning("[ProfileManager] Corrupt profiles.json, resetting to empty")
-		profiles = []
-		return
-	var d = j.get_data()
-	if not (d is Dictionary and d.has("profiles")):
-		profiles = []
-		return
-	var raw: Array = d["profiles"]
+	var d = _read_file(PROFILES_FILE)
+	if d.is_empty(): return
+	var raw: Array = d.get("profiles", [])
 	profiles = []
 	for item in raw:
 		if item is Dictionary:
@@ -34,15 +20,12 @@ func load_profiles():
 
 func save_profiles():
 	var d = {"profiles": profiles}
-	var f = FileAccess.open(PROFILES_FILE, FileAccess.WRITE)
-	if f:
-		f.store_string(JSON.stringify(d))
+	_write_file(PROFILES_FILE, d)
 	profiles_changed.emit()
 
 func add_profile(name: String, p_tiles: Array[Dictionary]):
 	if name == "":
 		return
-	# Duplicate name? Append suffix
 	var base = name
 	var n = 1
 	while _find_by_name(name) != -1:

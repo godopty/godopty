@@ -391,12 +391,7 @@ var _concept_list: VBoxContainer
 var _concept_terminal: GodoptyTerminal  # any terminal for global concept FFI
 
 func _add_concept_section(v: VBoxContainer):
-	# Find a terminal to use for concept FFI calls
-	var bodies = _workspace.find_children("*", "TerminalPane", true, false)
-	if bodies.size() > 0:
-		_concept_terminal = bodies[0]._terminal
-	else:
-		_concept_terminal = GodoptyTerminal.new()
+	_concept_terminal = _workspace.get_terminal_for_ffi()
 
 	var add_btn = Button.new()
 	add_btn.text = "Add Concept"

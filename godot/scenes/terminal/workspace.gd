@@ -23,7 +23,7 @@ func _ready():
 	_grid = Control.new()
 	add_child(_grid)
 
-	var overlay = load("res://scenes/toast_overlay.gd").new()
+	var overlay = load("res://scenes/ui/toast_overlay.gd").new()
 	add_child(overlay)
 
 	_build_sidebar()
@@ -137,7 +137,7 @@ func _reset():
 # Persistence
 # ═══════════════════════════════════════════════════════════════════════
 
-func _save():
+func _gather_tiles() -> Array[Dictionary]:
 	var ts: Array[Dictionary] = []
 	for t in _tm.tiles:
 		var body = _tm._find_body(t.wrapper)
@@ -145,8 +145,10 @@ func _save():
 		state["col"] = t.col; state["row"] = t.row
 		state["cspan"] = t.cspan; state["rspan"] = t.rspan
 		ts.append(state)
-	LayoutManager.save_tiles(ts)
+	return ts
 
+func _save():
+	LayoutManager.save_tiles(_gather_tiles())
 func _restore():
 	var tiles = LayoutManager.load_tiles()
 	if tiles.is_empty(): return
@@ -336,15 +338,16 @@ func _build_sidebar():
 # Profiles
 # ═══════════════════════════════════════════════════════════════════════
 
-func _save_current_as_profile():
-	# Gather current tiles
-	var ts: Array[Dictionary] = []
+func get_terminal_for_ffi() -> Node:
 	for t in _tm.tiles:
 		var body = _tm._find_body(t.wrapper)
-		var state = body._get_layout_state() if body and body.has_method("_get_layout_state") else {}
-		state["col"] = t.col; state["row"] = t.row
-		state["cspan"] = t.cspan; state["rspan"] = t.rspan
-		ts.append(state)
+		if body and body._terminal:
+			return body._terminal
+	return Node.new()
+
+func _save_current_as_profile():
+	# Gather current tiles
+	var ts = _gather_tiles()
 
 	if ts.is_empty():
 		ToastManager.warn("No terminals to save")

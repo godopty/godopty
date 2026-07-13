@@ -35,7 +35,7 @@ func is_shortcut(event: InputEvent) -> bool:
 			return true
 	return false
 
-func _shortcut_input(event):
+func _unhandled_input(event):
 	if not event is InputEventKey or not event.pressed: return
 	for action in _actions.keys():
 		if event.is_action_pressed(action, false, true): # exact match

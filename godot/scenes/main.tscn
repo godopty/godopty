@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cl21pjkev1gl1"]
 
-[ext_resource type="Script" uid="uid://b8cb58d47apmf" path="res://scenes/workspace.gd" id="1_workspace"]
+[ext_resource type="Script" uid="uid://b8cb58d47apmf" path="res://scenes/terminal/workspace.gd" id="1_workspace"]
 
 [node name="Workspace" type="Control" unique_id=492804709]
 layout_mode = 3

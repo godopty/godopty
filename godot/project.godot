@@ -17,13 +17,13 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-FocusManager="*res://scenes/focus_manager.gd"
-ToastManager="*res://scenes/toast_manager.gd"
-ShortcutManager="*res://scenes/shortcut_manager.gd"
-SettingsManager="*res://scenes/settings_manager.gd"
-ProfileManager="*res://scenes/profile_manager.gd"
-ConceptManager="*res://scenes/concept_manager.gd"
-LayoutManager="*res://scenes/layout_manager.gd"
+FocusManager="*res://scenes/autoloads/focus_manager.gd"
+ToastManager="*res://scenes/autoloads/toast_manager.gd"
+ShortcutManager="*res://scenes/autoloads/shortcut_manager.gd"
+SettingsManager="*res://scenes/autoloads/settings_manager.gd"
+ProfileManager="*res://scenes/autoloads/profile_manager.gd"
+ConceptManager="*res://scenes/autoloads/concept_manager.gd"
+LayoutManager="*res://scenes/autoloads/layout_manager.gd"
 
 [display]
 
