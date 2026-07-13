@@ -182,13 +182,13 @@ func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Labe
 	bar.add_child(btn_hbox)
 
 	var min_btn = Button.new()
-	min_btn.text = "▼"; min_btn.focus_mode = Control.FOCUS_NONE
+	min_btn.text = Icons.MINIMIZE; min_btn.focus_mode = Control.FOCUS_NONE
 	min_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	min_btn.pressed.connect(func(): _toggle_minimize(root, min_btn))
 	btn_hbox.add_child(min_btn)
 
 	var close_btn = Button.new()
-	close_btn.text = "✕"; close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.text = Icons.CLOSE; close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	close_btn.pressed.connect(func(): _handle_close(_find_body(root)))
 	btn_hbox.add_child(close_btn)
@@ -202,7 +202,7 @@ func _toggle_minimize(w: Control, btn: Button):
 	var body = _find_body(w)
 	if body:
 		body.visible = not body.visible
-		btn.text = "▼" if body.visible else "▲"
+		btn.text = Icons.MINIMIZE if body.visible else Icons.RESTORE
 
 func _handle_close(body: Control):
 	if on_close.is_valid():

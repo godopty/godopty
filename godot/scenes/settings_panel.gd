@@ -128,7 +128,7 @@ func _add_settings_header(v: VBoxContainer):
 	var h = HBoxContainer.new()
 	var t = Label.new(); t.text = "Settings"; t.add_theme_font_size_override("font_size", 18)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(t)
-	var x = Button.new(); x.text = "X"; x.flat = true
+	var x = Button.new(); x.text = Icons.CLOSE; x.flat = true
 	x.pressed.connect(func(): visible = false); h.add_child(x)
 	v.add_child(h)
 
@@ -421,7 +421,7 @@ func _refresh_concept_list():
 		var edit_btn = Button.new(); edit_btn.text = "Edit"
 		edit_btn.pressed.connect(_show_concept_dialog.bind(i))
 		h.add_child(edit_btn)
-		var del_btn = Button.new(); del_btn.text = "X"
+		var del_btn = Button.new(); del_btn.text = Icons.DELETE
 		del_btn.pressed.connect(func(): _delete_concept(i))
 		h.add_child(del_btn)
 		_concept_list.add_child(h)
@@ -465,6 +465,7 @@ func _save_concept(idx: int, name: String, regex_pat: String, cmd: String, targe
 	else:
 		concepts.append(entry)
 	_concept_terminal.set_global_concepts(concepts)
+	ConceptManager.save_concepts(concepts)
 	_refresh_concept_list()
 
 func _delete_concept(idx: int):
@@ -473,4 +474,5 @@ func _delete_concept(idx: int):
 	if idx >= 0 and idx < concepts.size():
 		concepts.remove_at(idx)
 		_concept_terminal.set_global_concepts(concepts)
+		ConceptManager.save_concepts(concepts)
 		_refresh_concept_list()
