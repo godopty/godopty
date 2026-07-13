@@ -3,7 +3,6 @@ class_name Workspace
 # godopty Workspace — tiling grid of terminal panes with title bars.
 # Tile lifecycle is delegated to TerminalManager.
 
-const LAYOUT_FILE = "user://layout.json"
 const GRID = 12
 const MIN_WINDOW_W = 500
 const MIN_WINDOW_H = 300
@@ -28,10 +27,12 @@ func _ready():
 	add_child(overlay)
 
 	_build_sidebar()
+	ProfileManager.load_profiles()
 	_apply_layout()
 	_wire_sidebar_signals()
+	_refresh_profile_buttons()
 	_tm.on_close = func(body: Control): _kill(body)
-	if FileAccess.file_exists(LAYOUT_FILE): _restore()
+	_restore()
 
 	ShortcutManager.register("app:new_pane", "Ctrl+Shift+N", func(): var p = _spawn(); if p: p.grab_focus())
 	ShortcutManager.register("app:close_pane", "Ctrl+Shift+W", func(): _kill_last())
@@ -144,46 +145,39 @@ func _save():
 		state["col"] = t.col; state["row"] = t.row
 		state["cspan"] = t.cspan; state["rspan"] = t.rspan
 		ts.append(state)
-	var d = {"tiles": ts}
-	var f = FileAccess.open(LAYOUT_FILE, FileAccess.WRITE)
-	if f: f.store_string(JSON.stringify(d))
+	LayoutManager.save_tiles(ts)
 
 func _restore():
-	if not FileAccess.file_exists(LAYOUT_FILE): return
-	var f = FileAccess.open(LAYOUT_FILE, FileAccess.READ)
-	if not f: return
-	var j = JSON.new()
-	if j.parse(f.get_as_text()) != OK: return
-	var d = j.get_data()
-	if not (d is Dictionary and d.has("tiles")): return
+	var tiles = LayoutManager.load_tiles()
+	if tiles.is_empty(): return
 
 	# Workspace trust: warn if saved shells differ from configured default
 	var untrusted := false
-	for td in d.tiles:
+	for td in tiles:
 		if not (td is Dictionary): continue
 		var sh = td.get("shell", "")
 		if sh != "" and sh != SettingsManager.cfg_shell_command:
 			untrusted = true
 			break
 	if untrusted:
-		_show_trust_dialog(d)
+		_show_trust_dialog(tiles)
 		return
-	_do_restore(d)
+	_do_restore(tiles)
 
-func _show_trust_dialog(d: Dictionary):
+func _show_trust_dialog(tiles: Array[Dictionary]):
 	var dialog = ConfirmationDialog.new()
 	dialog.title = "Workspace Trust"
 	dialog.dialog_text = "This layout was saved with a different shell than your current default (%s).\n\nDo you want to restore it anyway?" % SettingsManager.cfg_shell_command
 	dialog.ok_button_text = "Restore"
 	dialog.cancel_button_text = "Cancel"
-	dialog.confirmed.connect(func(): _do_restore(d); dialog.queue_free())
+	dialog.confirmed.connect(func(): _do_restore(tiles); dialog.queue_free())
 	dialog.canceled.connect(dialog.queue_free)
 	add_child(dialog)
 	dialog.popup_centered()
 
-func _do_restore(d: Dictionary):
+func _do_restore(tiles: Array[Dictionary]):
 	_tm.reset()
-	for td in d.tiles:
+	for td in tiles:
 		if not (td is Dictionary): continue
 		var sh = td.get("shell", SettingsManager.cfg_shell_command)
 		if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
@@ -283,6 +277,10 @@ func _wire_sidebar_signals():
 	_sidebar.request_reset.connect(func(): _reset(); _apply_layout(); _list())
 	_sidebar.request_focus.connect(func(body: Control): body.grab_focus())
 	_sidebar.toggled.connect(func(): _apply_layout())
+	_sidebar.request_profile.connect(_activate_profile)
+	_sidebar.request_save_profile.connect(_save_current_as_profile)
+	_sidebar.request_delete_profile.connect(_delete_profile)
+	ProfileManager.profiles_changed.connect(_refresh_profile_buttons)
 
 func _list():
 	if _sidebar == null: return
@@ -333,3 +331,128 @@ func _build_sidebar():
 	_sidebar_bg.add_child(_sidebar)
 	_sidebar.offset_right = 180
 	_sidebar.build(_sidebar_bg)
+
+# ═══════════════════════════════════════════════════════════════════════
+# Profiles
+# ═══════════════════════════════════════════════════════════════════════
+
+func _save_current_as_profile():
+	# Gather current tiles
+	var ts: Array[Dictionary] = []
+	for t in _tm.tiles:
+		var body = _tm._find_body(t.wrapper)
+		var state = body._get_layout_state() if body and body.has_method("_get_layout_state") else {}
+		state["col"] = t.col; state["row"] = t.row
+		state["cspan"] = t.cspan; state["rspan"] = t.rspan
+		ts.append(state)
+
+	if ts.is_empty():
+		ToastManager.warn("No terminals to save")
+		return
+
+	# Build save dialog
+	var dialog = ConfirmationDialog.new()
+	dialog.title = "Save Profile"
+	dialog.ok_button_text = "Save"
+	dialog.cancel_button_text = "Cancel"
+
+	var v = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	dialog.add_child(v)
+
+	var name_label = Label.new(); name_label.text = "Profile name:"
+	v.add_child(name_label)
+	var name_inp = LineEdit.new(); name_inp.placeholder_text = "My Profile"
+	v.add_child(name_inp)
+
+	var panes_label = Label.new(); panes_label.text = "Pane commands (edit to customize):"
+	v.add_child(panes_label)
+	var sc = ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(300, 200)
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(sc)
+	var panes_v = VBoxContainer.new()
+	sc.add_child(panes_v)
+
+	var shell_editors: Array[LineEdit] = []
+	for i in ts.size():
+		var row = HBoxContainer.new()
+		var lbl = Label.new(); lbl.text = "Pane %d:" % (i + 1)
+		lbl.custom_minimum_size = Vector2(55, 0)
+		row.add_child(lbl)
+		var le = LineEdit.new(); le.text = ts[i].get("shell", SettingsManager.cfg_shell_command)
+		le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		shell_editors.append(le)
+		row.add_child(le)
+		panes_v.add_child(row)
+
+	# OK only when name is non-empty
+	name_inp.text_changed.connect(func(t: String):
+		dialog.get_ok_button().disabled = (t.strip_edges() == "")
+	)
+	dialog.confirmed.connect(func():
+		var name = name_inp.text.strip_edges()
+		if name == "": return
+		for i in ts.size():
+			ts[i]["shell"] = shell_editors[i].text
+		ProfileManager.add_profile(name, ts)
+		ToastManager.info("Profile '%s' saved" % name)
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(dialog.queue_free)
+
+	add_child(dialog)
+	dialog.popup_centered()
+	# Disable OK initially (empty name)
+	name_inp.text_changed.emit("")
+
+func _activate_profile(name: String):
+	var idx = -1
+	var profs = ProfileManager.profiles
+	for i in profs.size():
+		if profs[i].get("name", "") == name:
+			idx = i
+			break
+	if idx == -1: return
+	var profile = profs[idx]
+
+	# Confirm if workspace has existing terminals
+	if _tm.tiles.size() > 0:
+		var dialog = ConfirmationDialog.new()
+		dialog.title = "Activate Profile"
+		dialog.dialog_text = "Activating a profile will replace your current layout. Continue?"
+		dialog.ok_button_text = "Activate"
+		dialog.cancel_button_text = "Cancel"
+		dialog.confirmed.connect(func():
+			_do_activate(profile)
+			dialog.queue_free()
+		)
+		dialog.canceled.connect(dialog.queue_free)
+		add_child(dialog)
+		dialog.popup_centered()
+	else:
+		_do_activate(profile)
+
+func _do_activate(profile: Dictionary):
+	_reset()
+	var tiles = profile.get("tiles", [])
+	for td in tiles:
+		if not (td is Dictionary): continue
+		var sh = td.get("shell", SettingsManager.cfg_shell_command)
+		if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
+		var w = _tm.build_wrapper(sh, td.get("rows", SettingsManager.cfg_default_rows), td.get("cols", SettingsManager.cfg_default_cols))
+		_grid.add_child(w)
+		var body = _tm._find_body(w)
+		body.focus_entered.connect(func(): _tm.last_body = body)
+		_tm.tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),
+			cspan = td.get("cspan", GRID), rspan = td.get("rspan", GRID)})
+	_apply_layout(); _list()
+	ToastManager.info("Profile '%s' activated" % profile.get("name", ""))
+
+func _delete_profile(idx: int):
+	ProfileManager.delete_profile(idx)
+	ToastManager.info("Profile deleted")
+
+func _refresh_profile_buttons():
+	if _sidebar:
+		_sidebar.update_profile_list(ProfileManager.get_profiles())

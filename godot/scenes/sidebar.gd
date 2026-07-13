@@ -9,10 +9,16 @@ signal request_settings
 signal request_reset
 signal request_focus(body: Control)
 signal toggled
+signal request_profile(name: String)
+signal request_save_profile
+signal request_delete_profile(index: int)
+
 
 var bg: ColorRect
 var _fps_label: Label
 var _pane_list: VBoxContainer
+var _profile_list: VBoxContainer
+
 
 func _ready():
 	clip_contents = true
@@ -29,6 +35,7 @@ func build(bg_rect: ColorRect):
 	_add_header(v)
 	_add_fps(v)
 	_add_buttons(v)
+	_add_profile_section(v)
 	_add_pane_list_ui(v)
 	_add_collapsed_button()
 
@@ -49,7 +56,7 @@ func update_pane_list(panes: Array):
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(func(): request_focus.emit(body))
 		row.add_child(btn)
-		var x = Button.new(); x.text = "✕"; x.flat = true
+		var x = Button.new(); x.text = Icons.CLOSE; x.flat = true
 		x.custom_minimum_size = Vector2(22, 0)
 		x.pressed.connect(func(): request_close.emit(body))
 		row.add_child(x)
@@ -62,7 +69,7 @@ func _add_header(v: VBoxContainer):
 	title.name = "SidebarTitle"; title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(title)
 	var arrow = Button.new()
-	arrow.text = "◀"; arrow.name = "SidebarArrow"
+	arrow.text = Icons.COLLAPSE; arrow.name = "SidebarArrow"
 	arrow.custom_minimum_size = Vector2(22, 22)
 	arrow.pressed.connect(_toggle_sidebar)
 	h.add_child(arrow)
@@ -79,10 +86,10 @@ func _add_fps(v: VBoxContainer):
 
 func _add_buttons(v: VBoxContainer):
 	for b in [
-		["+ Terminal", func(): request_new_pane.emit()],
-		["+ 16 Terminals", func(): request_bulk_spawn.emit(16)],
-		["⚙ Settings", func(): request_settings.emit()],
-		["↺ Reset", func(): request_reset.emit()],
+		[Icons.ADD + " Terminal", func(): request_new_pane.emit()],
+		[Icons.ADD + " 16 Terminals", func(): request_bulk_spawn.emit(16)],
+		[Icons.SETTINGS + " Settings", func(): request_settings.emit()],
+		[Icons.RESET + " Reset", func(): request_reset.emit()],
 	]:
 		var btn = Button.new(); btn.text = b[0]
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -98,7 +105,7 @@ func _add_pane_list_ui(v: VBoxContainer):
 
 func _add_collapsed_button():
 	var btn = Button.new()
-	btn.text = "▶"; btn.name = "SidebarCollapsedBtn"
+	btn.text = Icons.EXPAND; btn.name = "SidebarCollapsedBtn"
 	btn.custom_minimum_size = Vector2(18, 22)
 	btn.offset_left = 1; btn.offset_top = 2
 	btn.offset_right = 19; btn.visible = false
@@ -124,3 +131,47 @@ func _toggle_sidebar():
 		if a: a.visible = false
 		if coll: coll.visible = true
 	toggled.emit()
+
+func _add_profile_section(parent: VBoxContainer):
+	var section = VBoxContainer.new(); section.name = "ProfileSection"
+
+	var header = HBoxContainer.new(); header.name = "ProfileHeader"
+	var lbl = Label.new(); lbl.text = "Profiles:"; lbl.add_theme_font_size_override("font_size", 12)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(lbl)
+	var save_btn = Button.new(); save_btn.text = Icons.ADD; save_btn.name = "SaveProfileBtn"
+	save_btn.tooltip_text = "Save current layout as profile"
+	save_btn.flat = true
+	save_btn.custom_minimum_size = Vector2(22, 0)
+	save_btn.pressed.connect(func(): request_save_profile.emit())
+	header.add_child(save_btn)
+	section.add_child(header)
+
+	var sc = ScrollContainer.new(); sc.name = "ProfileScroll"
+	section.add_child(sc)
+
+	_profile_list = VBoxContainer.new(); _profile_list.name = "ProfileList"
+	_profile_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(_profile_list)
+
+	parent.add_child(section)
+
+func update_profile_list(profiles: Array[Dictionary]):
+	if not _profile_list: return
+	for c in _profile_list.get_children(): c.queue_free()
+	for i in profiles.size():
+		var p = profiles[i]
+		var name = p.get("name", "Unnamed")
+		var row = HBoxContainer.new()
+		var btn = Button.new(); btn.text = name
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.pressed.connect(func(): request_profile.emit(name))
+		row.add_child(btn)
+		var x = Button.new(); x.text = Icons.DELETE; x.flat = true
+		x.custom_minimum_size = Vector2(22, 0)
+		x.pressed.connect(func(): request_delete_profile.emit(i))
+		row.add_child(x)
+		_profile_list.add_child(row)
+
+	var sc = _profile_list.get_parent() as ScrollContainer
+	if sc: sc.custom_minimum_size.y = mini(200, profiles.size() * 35)
