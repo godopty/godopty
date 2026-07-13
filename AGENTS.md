@@ -52,9 +52,19 @@ Key modules in `godopty-core`:
 
 | File | Role |
 |---|---|
-| `workspace.gd` | **Root controller**: tile grid, layout, sidebar, palette, global settings panel, keyboard shortcuts |
+| `workspace.gd` | **Root controller**: tile grid, layout, sidebar, profile activation, global settings panel, keyboard shortcuts |
+| `sidebar.gd` | Side panel: static action buttons, profile save/activate/delete, pane list with focus/close |
+| `terminal_manager.gd` | `TerminalManager` (RefCounted): tile lifecycle, split/kill/expand logic, wrapper + title-bar builder |
 | `terminal_pane.gd` | **Active renderer** (Control-based): inherits from Control, draws cells via `_draw()`, handles input, selection, scrollback |
-| `focus_manager.gd` | Autoload singleton: Alt+Arrow geographic pane navigation |
+| `settings_panel.gd` | Overlay panel: cursor, font, colors, FPS, concepts, per-tab settings UI |
+| `settings_manager.gd` | Autoload: `user://settings.json` persistence, `settings_changed` signal, `apply_to_terminal()` |
+| `profile_manager.gd` | Autoload: `user://profiles.json` persistence, named terminal-layout save/load/delete |
+| `concept_manager.gd` | Autoload: `user://concepts.json` persistence; pushes to Rust `WorkspaceEngine` on startup |
+| `layout_manager.gd` | Autoload: `user://layout.json` persistence for workspace tile layout |
+| `focus_manager.gd` | Autoload: Alt+Arrow geographic pane navigation |
+| `toast_manager.gd` | Autoload: transient toast notifications (`info`, `warn`) |
+| `shortcut_manager.gd` | Autoload: extensible keyboard shortcut registry |
+| `icons.gd` | `class_name Icons` with `const` glyph strings — single source of truth for all UI icons |
 | `main.tscn` | Scene entry point |
 
 ### Data flow
@@ -68,11 +78,13 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 
 ### GDScript
 - **Indentation**: tabs
+- **Icons**: ALL UI icon glyphs live in `icons.gd` as `const` strings (`Icons.CLOSE`, `Icons.DELETE`, etc.). Never hardcode `"✕"` or `"🗑"` in button text — use the constant. Adding a new icon: add a `const` to `icons.gd`. Changing the glyph for every instance: one edit.
+- **Profiles**: named terminal-layout snapshots (`user://profiles.json`). `ProfileManager` autoload manages CRUD + `profiles_changed` signal. Save dialog is built inline in `workspace.gd` (not a separate scene). Profile activation clears the workspace (`_reset()`) then rebuilds tiles — follows `_do_restore()` pattern.
+- **JSON → typed arrays**: `JSON.parse()` returns untyped `Array`. Assignment to `Array[Dictionary]` fails at runtime. Always iterate and build the typed array element-by-element: `for item in raw: if item is Dictionary: typed.append(item)`.
 - **Private members**: underscore prefix (`_cell_w`, `_settings_panel`)
 - **Config vars**: `_cfg_` prefix (`_cfg_cursor_shape`)
-- **Export pattern**: `@export var` for properties settable from Inspector or externally
+- **Persistence**: All persistent user data follows the same autoload pattern. Each manager: (1) `extends Node` with `PROCESS_MODE_ALWAYS`, (2) owns a `user://*.json` file, (3) `load_*()` in `_ready()`, (4) `save_*()` writes JSON + emits signal, (5) registered in `project.godot` `[autoload]`. Four managers: `SettingsManager`, `ProfileManager`, `ConceptManager`, `LayoutManager`. Never inline `FileAccess.open()` in UI code — go through the autoload.
 - **Settings pipeline**: `_cfg_*` → `_save_settings()` → `user://settings.json`. To add a new setting: (1) add `_cfg_` var, (2) add UI control, (3) add one line to `_apply_settings_to()`. `_build_wrapper()` calls it automatically — no other wiring needed.
-- **Layout persistence**: `user://layout.json`
 - **Terminal spawning**: `_build_wrapper()` is the sole entry point; all paths go through it
 - **Layout Constraints**: The tiling grid relies on Godot `Control` nodes. Prefer using Godot's built-in Size Flags (Expand/Fill) inside containers (`HBoxContainer`/`VBoxContainer`) over manual pixel math. When manual math is absolutely required (like terminal cell reflows), hook into `_notification(NOTIFICATION_RESIZED)`.
 - **Pub-Sub Bridge**: To handle `WorkspaceEngine` events (like regex concept triggers) in Godot, GDScript must poll the Rust backend in `_process()` or rely on Rust calling `call_deferred("emit_signal", ...)`.
@@ -91,13 +103,16 @@ Shell → PTY I/O thread → vte parser → alacritty_terminal grid
 
 ### Commits
 - **Format**: [Conventional Commits](https://www.conventionalcommits.org/) — `feat(scope):`, `fix(scope):`, `chore(scope):`
-- Scopes: `settings`, `terminal`, `layout`, `sidebar`, `gdext`, `core`, `cli`
+- Scopes: `settings`, `terminal`, `layout`, `sidebar`, `gdext`, `core`, `cli`, `profiles`, `concepts`, `icons`
 
 ### Pitfalls
 - **`Drop` impl for external resources**: Any Rust struct holding a child process (`portable_pty::Child`) or I/O thread MUST implement `Drop` to call `.kill()`. Otherwise closing a terminal in Godot orphans the shell process and reader thread.
 - **`tokio::select!` None branches**: When a channel returns `None` (closed), `select!` disables that branch but keeps polling others instantly — causing 100% CPU. Bind to a variable first (`msg = rx.recv()`), then `let Ok(v) = msg else { break; }`.
 - **vte `Perform::execute` CR/LF**: PTY output uses CRLF pairs. The vte parser calls `execute` per byte. If you commit on both `\r` and `\n`, every line produces a spurious empty string. Track `last_was_cr` and skip the `\n` commit when preceded by `\r`.
 - **`alacritty_terminal` display_iter**: returns **negative** line numbers for scrollback history rows. Never cast directly to `usize` — it wraps to a huge value. Always add the grid's `display_offset()` to normalize: `let line = (indexed.point.line.0 + offset) as usize`.
+- **GDScript `\UXXXXXXXX` escape**: GDScript only supports `\uXXXX` (4-hex-digit BMP). `\UXXXXXXXX` (8-digit) does not exist — the parser mangles it. For non-BMP codepoints like 🗑 (U+1F5D1), use `char(0x1F5D1)` in `static var` initializers. BMP codepoints like ✕ (U+2715) work fine as `"\u2715"`.
+- **Typed arrays break Rust FFI**: gdext `Array<Variant>` parameters reject GDScript's `Array[Dictionary]` at runtime ("expected array of type Untyped, got Builtin(DICTIONARY)"). Always pass untyped `Array` across the FFI boundary. Prefer `func f(arr: Array)` over `func f(arr: Array[Dictionary])` when the array originates from or goes to Rust.
+- **Multi-line `for` array colon**: `for x in [...]` with a multi-line array literal requires `]:` at the end. Forgetting the colon produces a parse error at an unrelated line. Double-check after replacing inline array content.
 - **Godot typed Arrays**: `Array[T]` won't accept plain `Array`. If you type a parameter, check all call sites use matching types (`var x: Array[Control] = []`).
 - **GDExtension rebuilds**: After changing `#[func]` signatures or adding methods, rebuild with `cargo build -p godopty-gdext` and restart Godot.
 - **GDScript default params**: Evaluated at definition time, not call time. `func f(x := some_var)` captures the value of `some_var` when the script loads. Use `func f(x := -1)` and check `if x < 0: x = some_var` inside the body for runtime-evaluated defaults.

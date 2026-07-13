@@ -99,10 +99,19 @@ godopty/
     ├── godopty.gdextension
     └── scenes/
         ├── main.tscn
-        ├── workspace.gd        # Root controller, layout, settings, sidebar
+        ├── workspace.gd        # Root controller, layout, settings, sidebar, profiles
+        ├── sidebar.gd          # Side panel: buttons, profile section, pane list
         ├── terminal_pane.gd    # Terminal renderer (Control-based)
-        └── focus_manager.gd    # Autoload: Alt+Arrow pane navigation
-```
+        ├── terminal_manager.gd # Tile lifecycle, split/kill, wrapper builder
+        ├── settings_panel.gd   # Overlay settings panel with tabs
+        ├── settings_manager.gd # Autoload: settings persistence
+        ├── profile_manager.gd  # Autoload: named layout profiles
+        ├── concept_manager.gd  # Autoload: concept persistence
+        ├── layout_manager.gd   # Autoload: workspace layout persistence
+        ├── icons.gd            # Centralized UI icon glyph constants
+        ├── focus_manager.gd    # Autoload: Alt+Arrow pane navigation
+        ├── toast_manager.gd    # Autoload: transient toast notifications
+        └── shortcut_manager.gd # Autoload: keyboard shortcut registry
 
 ---
 
@@ -245,6 +254,10 @@ The Concept Engine allows developers to automate repetitive workflows based on s
 - [x] Configurable cursor blink speed (0.1–2.0 s)
 - [x] Configurable scroll wheel sensitivity (1–10 lines)
 - [x] Configurable default terminal dimensions (10–100 × 40–200)
+- [x] Named layout profiles — save/restore workspace configurations via sidebar (`user://profiles.json`)
+- [x] Centralized icon system (`icons.gd`) — single source of truth for all UI glyphs
+- [x] Concept persistence — regex triggers + actions saved to `user://concepts.json` via `ConceptManager` autoload
+- [x] Standardized persistence pattern — all managers (`SettingsManager`, `ProfileManager`, `ConceptManager`, `LayoutManager`) follow autoload + JSON + signal convention
 - [x] Configurable cursor thickness (beam width 1–8 px, underline height 1–8 px)
 - [x] Configurable UI theme colors (7 ColorPicker controls)
 - [x] Configurable font selection (file picker with `_add_file_picker()` reusable helper)
