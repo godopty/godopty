@@ -21,8 +21,17 @@ func _ready():
 	
 	_tree.item_activated.connect(func():
 		var item = _tree.get_selected()
+		if not item:
+			return
 		var path = item.get_metadata(0)
-		if path and FileAccess.file_exists(path):
+		if not path:
+			return
+		if DirAccess.dir_exists_absolute(path):
+			# Lazy-load children on first expand
+			if item.get_child_count() == 0:
+				_populate(item, path)
+			item.collapsed = not item.collapsed
+		elif FileAccess.file_exists(path):
 			OS.shell_open("file://" + path)
 	)
 
