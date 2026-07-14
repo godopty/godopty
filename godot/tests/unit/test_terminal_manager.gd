@@ -155,3 +155,41 @@ func test_swap_preserves_settings():
 
 # test_swap_pane_not_found removed — push_error from TerminalManager
 # conflicts with GUT's error tracking. Covered by integration tests.
+
+# ── Pane labels ─────────────────────────────────────────────────────────
+
+func test_pane_labels_per_type():
+	var t1 = _tm.spawn_pane("terminal", {})
+	assert_not_null(t1)
+	assert_eq(t1.pane_label, "T1", "first terminal should be T1")
+
+	var c1 = _tm.spawn_pane("code_viewer", {})
+	assert_not_null(c1)
+	assert_eq(c1.pane_label, "C1", "first code viewer should be C1")
+
+	var t2 = _tm.spawn_pane("terminal", {})
+	assert_not_null(t2)
+	assert_eq(t2.pane_label, "T2", "second terminal should be T2")
+
+func test_pane_labels_persist_after_kill():
+	var t1 = _tm.spawn_pane("terminal", {})
+	var t2 = _tm.spawn_pane("terminal", {})
+	assert_eq(t1.pane_label, "T1")
+	assert_eq(t2.pane_label, "T2")
+
+	_tm.kill(t1)
+	_tm.kill(t2)
+	assert_eq(_tm.tiles.size(), 0)
+
+	var t3 = _tm.spawn_pane("terminal", {})
+	assert_not_null(t3)
+	assert_eq(t3.pane_label, "T3", "label should be T3, not recycled T1")
+
+func test_reset_clears_counters():
+	_tm.spawn_pane("terminal", {})
+	_tm.spawn_pane("terminal", {})
+	_tm.reset()
+
+	var t1 = _tm.spawn_pane("terminal", {})
+	assert_not_null(t1)
+	assert_eq(t1.pane_label, "T1", "label should restart at T1 after reset")

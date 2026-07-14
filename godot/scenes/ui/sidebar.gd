@@ -51,7 +51,8 @@ func update_pane_list(panes: Array):
 	for i in panes.size():
 		var body = panes[i]
 		var row = HBoxContainer.new()
-		var btn = Button.new(); btn.text = "T%d" % (i + 1)
+		var btn = Button.new()
+		btn.text = body.get("pane_label") if body.get("pane_label") != "" else "%s?" % PaneTypes.ALL.get(body._pane_type(), {}).get("label_prefix", "?")
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(func(): request_focus.emit(body))
 		row.add_child(btn)

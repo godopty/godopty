@@ -100,3 +100,16 @@ func test_swap_pane_preserves_tile():
 	assert_not_null(new_body, "new body should exist in tile")
 	assert_eq(new_body._pane_type(), "code_viewer", "swapped body should be code_viewer")
 	assert_eq(new_body.pane_name, "Before", "pane_name should be preserved across swap")
+
+# ── Pane labels ─────────────────────────────────────────────────────────
+
+func test_pane_labels_have_correct_prefixes():
+	# Verify each pane type gets the right prefix on pane_label
+	var cases := {"terminal": "T", "code_viewer": "C", "file_tree": "F", "observer": "O"}
+	for type_name in cases:
+		_tm.reset()
+		var body = _tm.spawn_pane(type_name, {})
+		assert_not_null(body, "spawn_pane(%s) should return a body" % type_name)
+		var expected_label = cases[type_name] + "1"
+		assert_eq(body.pane_label, expected_label,
+			"%s should have label %s, got %s" % [type_name, expected_label, body.pane_label])

@@ -12,6 +12,8 @@ signal title_changed(new_title: String)
 		if _font != null:
 			_recompute_cell_metrics()
 
+
+var pane_label: String = ""  # "T1", "C3", etc. Assigned by TerminalManager.
 var _font: Font  # set by concrete types that render text
 
 func _ready():

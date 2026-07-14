@@ -22,6 +22,8 @@ var on_swap: Callable    # set by workspace to handle pane type swap
 var tiles: Array[Dictionary] = []
 var last_body: Control
 
+var _pane_counters: Dictionary = {}  # type_name -> next int
+
 var _pane_settings_panel  # set by workspace
 
 # ── Public spawn API ───────────────────────────────────────────────────
@@ -55,6 +57,7 @@ func spawn_pane(type_name: String, opts: Dictionary = {}) -> Control:
 
 	var body: Control = script.new()
 	body.name = "Body"
+	body.pane_label = _next_label(type_name)
 	body.apply_settings(opts)
 
 	var title = opts.get("title_label", PaneTypes.ALL.get(type_name, {}).get("name", type_name))
@@ -88,7 +91,14 @@ func create_body(type_name: String) -> Control:
 		return null
 	var body: Control = script.new()
 	body.name = "Body"
+	body.pane_label = _next_label(type_name)
 	return body
+
+func _next_label(type_name: String) -> String:
+	var count = _pane_counters.get(type_name, 0) + 1
+	_pane_counters[type_name] = count
+	var prefix = PaneTypes.ALL.get(type_name, {}).get("label_prefix", "?")
+	return "%s%d" % [prefix, count]
 
 # ── Legacy wrapper builder (for backward compat during transition) ─────
 
@@ -271,6 +281,7 @@ func reset():
 	for t in tiles: t.wrapper.queue_free()
 	tiles.clear()
 	last_body = null
+	_pane_counters.clear()
 
 # ── Tiling ─────────────────────────────────────────────────────────────
 
