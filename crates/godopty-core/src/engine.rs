@@ -336,15 +336,15 @@ fn handle_command(input: &StdinInput, grid: &Option<Arc<Mutex<TermGrid>>>, captu
                     if let Some(pos) = all_bytes.iter().rposition(|&b| b == b'\n') {
                         let prompt_bytes = &all_bytes[pos + 1..];
                         if !prompt_bytes.is_empty() {
+                            // The \r\n from Enter was buffered with the trigger
+                            // chunk and never reached the grid. Prepend \n so
+                            // the prompt starts on a fresh line.
+                            feed_grid(grid, b"\n");
                             feed_grid(grid, prompt_bytes);
-                            let mut lp = crate::parser::LineParser::new();
-                            let parsed = lp.feed(prompt_bytes);
-                            for line in &parsed {
-                                store_line(grid, line);
-                            }
                         }
                     } else {
                         // No newline at all — entire buffer is the prompt
+                        feed_grid(grid, b"\n");
                         feed_grid(grid, &all_bytes);
                     }
                 }
