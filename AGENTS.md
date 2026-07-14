@@ -13,12 +13,18 @@ Rust + Godot 4.7 multi-PTY terminal emulator with a tiling grid GUI.
 ```bash
 # Build the GDExtension shared library
 cargo build -p godopty-gdext
+# Copy to the Godot project for local development
+cp target/debug/libgodopty_gdext.so godot/bin/libgodopty_gdext.linux.x86_64.so
 
-# Run all Rust unit tests
-cargo test -p godopty-core
+# Run all Rust tests (57 across core, gdext, cli)
+cargo test --workspace
 
 # Type-check Rust only (fast, no codegen)
 cargo check
+
+# Run all GDScript tests (59 unit + integration, headless)
+godot --headless --path godot --import
+godot --headless --path godot -s addons/gut/gut_cmdln.gd -d -gdir=res://tests/unit -gdir=res://tests/integration
 
 # CLI demos (no Godot needed)
 cargo run --bin godopty-cli              # mock pub-sub
@@ -60,7 +66,8 @@ scenes/
 │   ├── layout_manager.gd            # user://layout.json, workspace tile persistence
 │   ├── focus_manager.gd             # Alt+Arrow geographic pane navigation
 │   ├── toast_manager.gd             # Transient toast notifications
-│   └── shortcut_manager.gd          # Keyboard shortcut registry (via InputMap)
+│   ├── shortcut_manager.gd          # Keyboard shortcut registry (via InputMap)
+│   └── update_checker.gd            # Polls GitHub Releases for new versions on startup
 ├── terminal/
 │   ├── workspace.gd                 # Root controller: tile grid, layout, sidebar, profiles
 │   ├── terminal_pane.gd             # Control-based renderer: _draw(), input, selection
@@ -82,6 +89,43 @@ scenes/
 ```
 Shell → PTY I/O thread → vte parser → alacritty_terminal grid
   → Arc<Mutex<TermGrid>> → GodoptyTerminal (gdext) → GDScript _draw()
+```
+
+## Testing
+
+### Rust
+
+```bash
+cargo test --workspace          # 57 tests across core, gdext, cli
+cargo test -p godopty-core      # core library only (44 tests)
+```
+
+### GDScript (GUT)
+
+Tests live in `godot/tests/` — `unit/` for pure-logic classes, `integration/` for scene-tree tests.
+
+```bash
+godot --headless --path godot --import         # required before first run
+godot --headless --path godot -s addons/gut/gut_cmdln.gd -d \
+  -gdir=res://tests/unit -gdir=res://tests/integration
+```
+
+**Mocking autoloads**: Use `MockAutoloads.setup()` / `teardown()` in `before_each`/`after_each`.
+Persistence managers (`SettingsManager`, `ProfileManager`, `LayoutManager`) are mocked via
+`set_script()` on the existing autoload node, redirecting `_read_file`/`_write_file` to an
+in-memory Dictionary. This avoids touching disk and preserves Godot 4 global name bindings
+(`SettingsManager` etc. are static constants — never `free()` autoload nodes).
+
+**Signal testing**: GDScript lambdas cannot capture outer primitives. Use GUT's
+`watch_signals(node)` + `assert_signal_emitted(node, "signal_name")` instead of
+`node.signal.connect(func(): captured_var = true)`.
+
+**Type checks**: `body is SomeClass` requires a compile-time class name. For runtime type
+discrimination, use `body._pane_type()` string discriminators.
+
+**Headless resource leaks**: GUT warnings about unfreed children and GDExtension `RID`/`ObjectDB`
+leaks are benign in headless mode — the dummy render server doesn't track GDExtension resources.
+Production renderer handles these correctly.
 ```
 
 ## Conventions
