@@ -1,13 +1,19 @@
 extends Control
 class_name Workspace
-# godopty Workspace — tiling grid of terminal panes with title bars.
+# godopty Workspace — tiling grid of panes with title bars.
 # Tile lifecycle is delegated to TerminalManager.
 
 const GRID = 12
 const MIN_WINDOW_W = 500
 const MIN_WINDOW_H = 300
 
-const PALETTE_COMMANDS = ["new terminal", "close active", "settings", "reset layout", "save", "load"]
+# Palette commands are built dynamically from PaneTypes.ALL
+static func _build_palette_commands() -> Array[String]:
+	var cmds: Array[String] = []
+	for key in PaneTypes.ALL:
+		cmds.append("new " + PaneTypes.ALL[key]["name"].to_lower())
+	cmds.append_array(["close active", "settings", "reset layout", "save", "load"])
+	return cmds
 
 var _sidebar: Sidebar
 var _sidebar_bg: ColorRect
@@ -38,7 +44,10 @@ func _ready():
 	_tm.on_close = func(body: Control): _kill(body)
 	_restore()
 
-	ShortcutManager.register("app:new_pane", "Ctrl+Shift+N", func(): var p = _spawn(); if p: p.grab_focus())
+	# Per-type keyboard shortcuts
+	for key in PaneTypes.ALL:
+		var info = PaneTypes.ALL[key]
+		ShortcutManager.register("app:new_" + key, info["shortcut"], func(): var b = _spawn_pane(key); if b: b.grab_focus())
 	ShortcutManager.register("app:close_pane", "Ctrl+Shift+W", func(): _kill_last())
 	ShortcutManager.register("app:toggle_sidebar", "Ctrl+Shift+B", _toggle_sidebar)
 	ShortcutManager.register("app:toggle_palette", "Ctrl+Shift+P", _toggle_palette)
@@ -53,7 +62,8 @@ func _ready():
 func _on_settings_changed():
 	for t in _tm.tiles:
 		var body = _tm._find_body(t.wrapper)
-		if body: SettingsManager.apply_to_terminal(body)
+		if body and body is TerminalPane:
+			SettingsManager.apply_to_terminal(body)
 	_apply_fps_setting()
 
 func _apply_fps_setting():
@@ -94,26 +104,33 @@ func _apply_layout():
 # ═══════════════════════════════════════════════════════════════════════
 
 func _spawn(shell := "") -> Control:
-	var body = _tm.spawn(shell)
+	return _spawn_pane("terminal", {"shell_command": shell})
+
+func _spawn_pane(type_name: String, opts := {}) -> Control:
+	var body = _tm.spawn_pane(type_name, opts)
 	if body == null:
-		ToastManager.warn("Cannot add terminal — panes would be too small")
+		ToastManager.warn("Cannot add pane — grid is full")
 		return null
-	# TerminalManager already added the wrapper to its tiles; add to scene tree
 	var w = _tm.tiles[-1].wrapper
+	_add_body_to_grid(w, body, PaneTypes.ALL[type_name]["name"])
+	return body
+
+func _add_body_to_grid(w: Control, body: Control, label: String):
 	_grid.add_child(w)
 	body.focus_entered.connect(func(): _tm.last_body = body)
 	_apply_layout()
 	_list()
-	ToastManager.info("Terminal spawned")
-	return body
+	ToastManager.info("%s spawned" % label)
 
 func _spawn_bulk(count: int, shell := ""):
+	var start_size = _tm.tiles.size()
 	var bodies = _tm.spawn_bulk(count, shell)
 	if bodies.is_empty():
 		ToastManager.warn("Cannot add terminals — grid is full")
 		return
-	for body in bodies:
-		var w = body.get_parent().get_parent()  # BodyVBox → PanelContainer
+	for i in bodies.size():
+		var w = _tm.tiles[start_size + i].wrapper
+		var body = bodies[i]
 		_grid.add_child(w)
 		body.focus_entered.connect(func(): _tm.last_body = body)
 	_apply_layout()
@@ -125,7 +142,7 @@ func _kill(body: Control):
 	_tm.kill(body)
 	_apply_layout()
 	_list()
-	ToastManager.info("Terminal closed")
+	ToastManager.info("Pane closed")
 
 func _kill_last():
 	_tm.kill_last()
@@ -155,6 +172,7 @@ func _gather_tiles() -> Array[Dictionary]:
 
 func _save():
 	LayoutManager.save_tiles(_gather_tiles())
+
 func _restore():
 	var tiles = LayoutManager.load_tiles()
 	if tiles.is_empty(): return
@@ -189,15 +207,28 @@ func _do_restore(tiles: Array[Dictionary]):
 	for td in tiles:
 		if not (td is Dictionary): continue
 		var settings = td.get("settings", {})
-		# Prefer shell/rows/cols from settings dict (new format), fall back to top-level (old format)
-		var sh = settings.get("shell", td.get("shell", SettingsManager.cfg_shell_command))
-		if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
-		var r = settings.get("rows", td.get("rows", SettingsManager.cfg_default_rows))
-		var c = settings.get("cols", td.get("cols", SettingsManager.cfg_default_cols))
-		var w = _tm.build_wrapper(sh, r, c)
-		var body = _tm._find_body(w)
-		if not settings.is_empty():
-			SettingsManager.apply_pane_settings(body, settings)
+		var type_name = settings.get("type", "terminal")
+
+		var body = _tm.create_body(type_name)
+		if body == null: continue
+		body.apply_settings(settings)
+
+		# For terminals: apply global defaults and shell override
+		if type_name == "terminal":
+			var sh = settings.get("shell", td.get("shell", SettingsManager.cfg_shell_command))
+			if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
+			SettingsManager.apply_to_terminal(body)
+			body.shell_command = sh
+
+		var title = PaneTypes.ALL.get(type_name, {}).get("name", type_name)
+		var w = _tm._build_wrapper_body(body, title)
+
+		if type_name == "terminal":
+			body.title_changed.connect(func(t: String):
+				var lbl = w.get_node_or_null("BodyVBox/TitleBar/TitleLabel")
+				if lbl: lbl.text = " " + t
+			)
+
 		_grid.add_child(w)
 		body.focus_entered.connect(func(): _tm.last_body = body)
 		_tm.tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),
@@ -247,9 +278,10 @@ func _build_palette() -> Control:
 	var results = VBoxContainer.new()
 	v.add_child(results)
 
+	var cmds = _build_palette_commands()
 	inp.text_changed.connect(func(t: String):
 		for c in results.get_children(): c.queue_free()
-		for cmd in PALETTE_COMMANDS:
+		for cmd in cmds:
 			if t == "" or cmd.findn(t) != -1:
 				var btn = Button.new()
 				btn.text = cmd; btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -268,8 +300,15 @@ func _build_palette() -> Control:
 	return bg
 
 func _execute_command(cmd: String):
+	if cmd.begins_with("new "):
+		var name = cmd.substr(4).strip_edges()
+		for key in PaneTypes.ALL:
+			if PaneTypes.ALL[key]["name"].to_lower() == name:
+				var body = _spawn_pane(key)
+				if body: body.grab_focus()
+				return
+		return
 	match cmd:
-		"new terminal": var p = _spawn(); if p: p.grab_focus()
 		"close active": _kill_last()
 		"settings": _toggle_settings()
 		"reset layout": _reset()
@@ -284,7 +323,7 @@ func _execute_command(cmd: String):
 # ── Sidebar ───────────────────────────────────────────────────────────
 
 func _wire_sidebar_signals():
-	_sidebar.request_new_pane.connect(func(): var p = _spawn(); if p: p.grab_focus())
+	_sidebar.request_new_pane.connect(_spawn_pane)
 	_sidebar.request_bulk_spawn.connect(func(count: int): _spawn_bulk(count))
 	_sidebar.request_close_last.connect(func(): _kill_last())
 	_sidebar.request_close.connect(func(body: Control): _kill(body))
@@ -363,7 +402,7 @@ func _save_current_as_profile():
 	var ts = _gather_tiles()
 
 	if ts.is_empty():
-		ToastManager.warn("No terminals to save")
+		ToastManager.warn("No panes to save")
 		return
 
 	# Build save dialog
@@ -434,7 +473,7 @@ func _activate_profile(name: String):
 	if idx == -1: return
 	var profile = profs[idx]
 
-	# Confirm if workspace has existing terminals
+	# Confirm if workspace has existing panes
 	if _tm.tiles.size() > 0:
 		var dialog = ConfirmationDialog.new()
 		dialog.title = "Activate Profile"
@@ -457,14 +496,27 @@ func _do_activate(profile: Dictionary):
 	for td in tiles:
 		if not (td is Dictionary): continue
 		var settings = td.get("settings", {})
-		var sh = settings.get("shell", td.get("shell", SettingsManager.cfg_shell_command))
-		if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
-		var r = settings.get("rows", td.get("rows", SettingsManager.cfg_default_rows))
-		var c = settings.get("cols", td.get("cols", SettingsManager.cfg_default_cols))
-		var w = _tm.build_wrapper(sh, r, c)
-		var body = _tm._find_body(w)
-		if not settings.is_empty():
-			SettingsManager.apply_pane_settings(body, settings)
+		var type_name = settings.get("type", "terminal")
+
+		var body = _tm.create_body(type_name)
+		if body == null: continue
+		body.apply_settings(settings)
+
+		if type_name == "terminal":
+			var sh = settings.get("shell", td.get("shell", SettingsManager.cfg_shell_command))
+			if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
+			SettingsManager.apply_to_terminal(body)
+			body.shell_command = sh
+
+		var title = PaneTypes.ALL.get(type_name, {}).get("name", type_name)
+		var w = _tm._build_wrapper_body(body, title)
+
+		if type_name == "terminal":
+			body.title_changed.connect(func(t: String):
+				var lbl = w.get_node_or_null("BodyVBox/TitleBar/TitleLabel")
+				if lbl: lbl.text = " " + t
+			)
+
 		_grid.add_child(w)
 		body.focus_entered.connect(func(): _tm.last_body = body)
 		_tm.tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),

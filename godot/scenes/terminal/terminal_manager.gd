@@ -1,6 +1,7 @@
 extends RefCounted
 class_name TerminalManager
-# godopty Terminal Manager — owns tile lifecycle and terminal building.
+# godopty Terminal Manager — owns tile lifecycle and pane building.
+# Now supports any PaneBody type via spawn_pane().
 
 const GRID = 12
 const MIN_TILE = 2
@@ -8,7 +9,12 @@ const TITLE_BAR_HEIGHT = 26
 const BUTTON_MIN_WIDTH = 22
 const BUTTON_MIN_HEIGHT = 18
 
-const TerminalPaneScript = preload("res://scenes/terminal/terminal_pane.gd")
+const _PaneScripts := {
+	"terminal":    preload("res://scenes/terminal/terminal_pane.gd"),
+	"code_viewer": preload("res://scenes/panes/code_viewer.gd"),
+	"file_tree":   preload("res://scenes/panes/file_tree.gd"),
+	"observer":    preload("res://scenes/panes/observer_pane.gd"),
+}
 
 var on_close: Callable  # set by workspace to refresh layout after kill
 
@@ -17,33 +23,172 @@ var last_body: Control
 
 var _pane_settings_panel  # set by workspace
 
+# ── Public spawn API ───────────────────────────────────────────────────
+
 func spawn(shell := "") -> Control:
 	var s = shell if shell != "" else SettingsManager.cfg_shell_command
-	var w = _build_wrapper(s, SettingsManager.cfg_default_rows, SettingsManager.cfg_default_cols)
+	return spawn_pane("terminal", {
+		"shell_command": s,
+		"rows": SettingsManager.cfg_default_rows,
+		"cols": SettingsManager.cfg_default_cols,
+	})
+
+func spawn_bulk(count: int, shell := "") -> Array[Control]:
+	var spawned: Array[Control] = []
+	var s = shell if shell != "" else SettingsManager.cfg_shell_command
+	for i in count:
+		var body = spawn_pane("terminal", {
+			"shell_command": s,
+			"rows": SettingsManager.cfg_default_rows,
+			"cols": SettingsManager.cfg_default_cols,
+		})
+		if body == null: break
+		spawned.append(body)
+	return spawned
+
+func spawn_pane(type_name: String, opts: Dictionary = {}) -> Control:
+	var script = _PaneScripts.get(type_name)
+	if script == null:
+		push_error("Unknown pane type: " + type_name)
+		return null
+
+	var body: Control = script.new()
+	body.name = "Body"
+	body.apply_settings(opts)
+
+	var title = opts.get("title_label", PaneTypes.ALL.get(type_name, {}).get("name", type_name))
+	var w = _build_wrapper_body(body, title)
+
 	if tiles.is_empty():
 		tiles.append({wrapper = w, col = 0, row = 0, cspan = GRID, rspan = GRID})
 	else:
 		if not _split_for(w):
 			w.queue_free()
 			return null
-	# Caller adds to scene tree and connects signals
-	var body = _find_body(w)
+
+	# For terminal panes, apply global defaults and wire dynamic title
+	if type_name == "terminal":
+		if body.has_method("_terminal"):
+			SettingsManager.apply_to_terminal(body)
+			var s = opts.get("shell_command", SettingsManager.cfg_shell_command)
+			body.shell_command = s if s != "" else SettingsManager.cfg_shell_command
+		body.title_changed.connect(func(t: String):
+			var lbl = w.get_node_or_null("BodyVBox/TitleBar/TitleLabel")
+			if lbl: lbl.text = " " + t
+		)
+
 	return body
 
-func spawn_bulk(count: int, shell := "") -> Array[Control]:
-	var spawned: Array[Control] = []
-	var s = shell if shell != "" else SettingsManager.cfg_shell_command
-	for i in count:
-		var w = _build_wrapper(s, SettingsManager.cfg_default_rows, SettingsManager.cfg_default_cols)
-		if tiles.is_empty():
-			tiles.append({wrapper = w, col = 0, row = 0, cspan = GRID, rspan = GRID})
-		else:
-			if not _split_for(w):
-				w.queue_free()
-				break
-		var body = _find_body(w)
-		if body: spawned.append(body)
-	return spawned
+# Create a pane body without auto-split (used by restore/activate)
+func create_body(type_name: String) -> Control:
+	var script = _PaneScripts.get(type_name)
+	if script == null:
+		push_error("Unknown pane type: " + type_name)
+		return null
+	var body: Control = script.new()
+	body.name = "Body"
+	return body
+
+# ── Legacy wrapper builder (for backward compat during transition) ─────
+
+func build_wrapper(shell: String, rows: int, cols: int) -> Control:
+	var body: Control = _PaneScripts["terminal"].new()
+	body.name = "Body"
+	body.rows = rows
+	body.cols = cols
+
+	var title = shell.get_file() if shell else "terminal"
+	var w = _build_wrapper_body(body, title)
+
+	SettingsManager.apply_to_terminal(body)
+	body.shell_command = shell if shell != "" else SettingsManager.cfg_shell_command
+
+	body.title_changed.connect(func(t: String):
+		var lbl = w.get_node_or_null("BodyVBox/TitleBar/TitleLabel")
+		if lbl: lbl.text = " " + t
+	)
+	return w
+
+# ── Wrapper shell builder (shared across all pane types) ───────────────
+
+func _build_wrapper_body(body: Control, title: String) -> Control:
+	var root = PanelContainer.new()
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = SettingsManager.cfg_wrapper_bg
+	sb.border_width_left = 1; sb.border_width_right = 1
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_color = SettingsManager.cfg_wrapper_border
+	root.add_theme_stylebox_override("panel", sb)
+
+	var vbox = _make_vbox()
+	root.add_child(vbox)
+
+	_add_title_bar(vbox, title, root)
+
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(body)
+
+	return root
+
+func _make_vbox() -> VBoxContainer:
+	var v = VBoxContainer.new()
+	v.name = "BodyVBox"
+	v.add_theme_constant_override("separation", 0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	return v
+
+func _add_title_bar(parent: VBoxContainer, title: String, root: Control) -> Label:
+	var bar = Control.new()
+	bar.name = "TitleBar"
+	bar.custom_minimum_size = Vector2(0, TITLE_BAR_HEIGHT)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(bar)
+
+	var tbg = ColorRect.new()
+	tbg.color = SettingsManager.cfg_title_bar_bg
+	bar.add_child(tbg)
+	tbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var lbl = Label.new()
+	lbl.name = "TitleLabel"
+	lbl.text = " " + title
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bar.add_child(lbl)
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var btn_hbox = HBoxContainer.new()
+	btn_hbox.add_theme_constant_override("separation", 2)
+	btn_hbox.anchor_left = 1.0; btn_hbox.anchor_right = 1.0
+	btn_hbox.anchor_top = 0.0; btn_hbox.anchor_bottom = 1.0
+	var btn_total = 3 * BUTTON_MIN_WIDTH + 8
+	btn_hbox.offset_left = -btn_total
+	btn_hbox.offset_right = -2
+	bar.add_child(btn_hbox)
+
+	var min_btn = Button.new()
+	min_btn.text = Icons.MINIMIZE; min_btn.focus_mode = Control.FOCUS_NONE
+	min_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
+	min_btn.pressed.connect(func(): _toggle_minimize(root, min_btn))
+	btn_hbox.add_child(min_btn)
+
+	var settings_btn = Button.new()
+	settings_btn.text = Icons.SETTINGS; settings_btn.focus_mode = Control.FOCUS_NONE
+	settings_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
+	settings_btn.pressed.connect(func(): _open_pane_settings(_find_body(root)))
+	btn_hbox.add_child(settings_btn)
+
+	var close_btn = Button.new()
+	close_btn.text = Icons.CLOSE; close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
+	close_btn.pressed.connect(func(): _handle_close(_find_body(root)))
+	btn_hbox.add_child(close_btn)
+
+	return lbl
+
+# ── Lifecycle ──────────────────────────────────────────────────────────
 
 func kill(body: Control):
 	if last_body == body: last_body = null
@@ -64,6 +209,8 @@ func reset():
 	for t in tiles: t.wrapper.queue_free()
 	tiles.clear()
 	last_body = null
+
+# ── Tiling ─────────────────────────────────────────────────────────────
 
 func _split_for(w: Control) -> bool:
 	var bi = 0; var ba = 0
@@ -115,93 +262,7 @@ func _expand_partial(rm: Dictionary):
 		tiles[0].col = 0; tiles[0].row = 0
 		tiles[0].cspan = GRID; tiles[0].rspan = GRID
 
-# ── Terminal wrapper builder ──────────────────────────────────────────
-
-func build_wrapper(shell: String, rows: int, cols: int) -> Control:
-	var root = PanelContainer.new()
-	var sb = StyleBoxFlat.new()
-	sb.bg_color = SettingsManager.cfg_wrapper_bg
-	sb.border_width_left = 1; sb.border_width_right = 1
-	sb.border_width_top = 1; sb.border_width_bottom = 1
-	sb.border_color = SettingsManager.cfg_wrapper_border
-	root.add_theme_stylebox_override("panel", sb)
-
-	var vbox = _make_vbox()
-	root.add_child(vbox)
-
-	var lbl = _add_title_bar(vbox, shell, root)
-
-	var term = TerminalPaneScript.new()
-	term.name = "Body"
-	term.rows = rows; term.cols = cols
-	term.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	term.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(term)
-
-	SettingsManager.apply_to_terminal(term)
-	# Override with this pane's specific shell (may differ from default)
-	term.shell_command = shell if shell != "" else SettingsManager.cfg_shell_command
-	term.title_changed.connect(func(t: String): lbl.text = " " + t)
-
-	return root
-
-func _build_wrapper(shell: String, rows: int, cols: int) -> Control:
-	return build_wrapper(shell, rows, cols)
-
-func _make_vbox() -> VBoxContainer:
-	var v = VBoxContainer.new()
-	v.name = "BodyVBox"
-	v.add_theme_constant_override("separation", 0)
-	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	return v
-
-func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Label:
-	var bar = Control.new()
-	bar.custom_minimum_size = Vector2(0, TITLE_BAR_HEIGHT)
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	parent.add_child(bar)
-
-	var tbg = ColorRect.new()
-	tbg.color = SettingsManager.cfg_title_bar_bg
-	bar.add_child(tbg)
-	tbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var lbl = Label.new()
-	lbl.text = " " + (shell.get_file() if shell else "terminal")
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	bar.add_child(lbl)
-	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var btn_hbox = HBoxContainer.new()
-	btn_hbox.add_theme_constant_override("separation", 2)
-	btn_hbox.anchor_left = 1.0; btn_hbox.anchor_right = 1.0
-	btn_hbox.anchor_top = 0.0; btn_hbox.anchor_bottom = 1.0
-	var btn_total = 3 * BUTTON_MIN_WIDTH + 8
-	btn_hbox.offset_left = -btn_total
-	btn_hbox.offset_right = -2
-	bar.add_child(btn_hbox)
-
-	var min_btn = Button.new()
-	min_btn.text = Icons.MINIMIZE; min_btn.focus_mode = Control.FOCUS_NONE
-	min_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
-	min_btn.pressed.connect(func(): _toggle_minimize(root, min_btn))
-	btn_hbox.add_child(min_btn)
-
-	var settings_btn = Button.new()
-	settings_btn.text = Icons.SETTINGS; settings_btn.focus_mode = Control.FOCUS_NONE
-	settings_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
-	settings_btn.pressed.connect(func(): _open_pane_settings(_find_body(root)))
-	btn_hbox.add_child(settings_btn)
-
-	var close_btn = Button.new()
-	close_btn.text = Icons.CLOSE; close_btn.focus_mode = Control.FOCUS_NONE
-	close_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
-	close_btn.pressed.connect(func(): _handle_close(_find_body(root)))
-	btn_hbox.add_child(close_btn)
-
-	return lbl
+# ── Helpers ────────────────────────────────────────────────────────────
 
 func _find_body(w: Control) -> Control:
 	return w.get_node_or_null("BodyVBox/Body")

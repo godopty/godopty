@@ -1,7 +1,7 @@
 extends Control
 class_name Sidebar
 
-signal request_new_pane
+signal request_new_pane(type_name: String)
 signal request_bulk_spawn(count: int)
 signal request_close_last
 signal request_close(body: Control)
@@ -85,15 +85,40 @@ func _add_fps(v: VBoxContainer):
 	v.add_child(_fps_label)
 
 func _add_buttons(v: VBoxContainer):
+	# Add Pane button with PopupMenu listing all pane types
+	_add_pane_buttons(v)
+
+	# Remaining actions
 	for b in [
-		[Icons.ADD + " Terminal", func(): request_new_pane.emit()],
-		[Icons.ADD + " 16 Terminals", func(): request_bulk_spawn.emit(16)],
 		[Icons.SETTINGS + " Settings", func(): request_settings.emit()],
 		[Icons.RESET + " Reset", func(): request_reset.emit()],
 	]:
 		var btn = Button.new(); btn.text = b[0]
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(b[1]); v.add_child(btn)
+
+func _add_pane_buttons(v: VBoxContainer):
+	var add_btn = Button.new()
+	add_btn.text = Icons.ADD + " Add Pane"
+	add_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_btn.pressed.connect(func():
+		var menu = PopupMenu.new()
+		var keys = PaneTypes.ALL.keys()
+		for i in keys.size():
+			var info = PaneTypes.ALL[keys[i]]
+			menu.add_item(info["icon"] + " " + info["name"])
+		menu.add_separator()
+		menu.add_item("Terminal (x16)")
+		menu.id_pressed.connect(func(id: int):
+			if id < keys.size():
+				request_new_pane.emit(keys[id])
+			else:
+				request_bulk_spawn.emit(16)
+		)
+		add_child(menu)
+		menu.popup(Rect2(add_btn.get_screen_position(), add_btn.size))
+	)
+	v.add_child(add_btn)
 
 func _add_pane_list_ui(v: VBoxContainer):
 	var lbl = Label.new(); lbl.text = " Panes:"; lbl.add_theme_font_size_override("font_size", 12)

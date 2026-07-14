@@ -1,4 +1,4 @@
-extends Control
+extends PaneBody
 class_name FileTreePane
 # Simple file tree pane — lists files in a directory.
 
@@ -8,7 +8,7 @@ var _tree: Tree
 var _dir: DirAccess
 
 func _ready():
-	add_to_group("panes")
+	super._ready()
 	
 	_tree = Tree.new()
 	_tree.name = "FileTree"
@@ -40,11 +40,64 @@ func _populate(parent: TreeItem, path: String):
 		item.set_text(0, file_name)
 		var full = path.path_join(file_name)
 		item.set_metadata(0, full)
-		# TODO: add icon
-		# if dir.current_is_dir():
-			# item.set_icon(0, preload("res://icon.svg"))
 		file_name = dir.get_next()
 	dir.list_dir_end()
 
+func _pane_type() -> String:
+	return "file_tree"
+
 func _get_layout_state() -> Dictionary:
-	return {"type": "file_tree", "root_path": root_path}
+	var state = super._get_layout_state()
+	state.merge({"root_path": root_path})
+	return state
+
+func apply_settings(settings: Dictionary):
+	super.apply_settings(settings)
+	if settings.has("root_path") and _tree != null:
+		_tree.clear()
+		_tree.create_item()
+		_populate(_tree.get_root(), root_path)
+
+func _build_pane_settings_ui(panel: Control) -> Control:
+	var v = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	
+	# ── Shared pane controls ──
+	var name_le = LineEdit.new()
+	name_le.text = pane_name
+	name_le.placeholder_text = "File Tree"
+	name_le.text_changed.connect(func(_s): panel._debounce_timer.start())
+	_add_setting_row(v, "Name:", name_le)
+	
+	var font_spin = SpinBox.new()
+	font_spin.min_value = 8; font_spin.max_value = 32
+	font_spin.value = font_size
+	font_spin.value_changed.connect(func(_v): panel._debounce_timer.start())
+	_add_setting_row(v, "Font size:", font_spin)
+	
+	v.add_child(HSeparator.new())
+	
+	# ── File tree controls ──
+	var root_le = LineEdit.new()
+	root_le.text = root_path
+	root_le.placeholder_text = "/path/to/dir"
+	root_le.text_changed.connect(func(_s): panel._debounce_timer.start())
+	_add_setting_row(v, "Root path:", root_le)
+	
+	panel._gather_func = func():
+		return {
+			"pane_name": name_le.text.strip_edges(),
+			"font_size": int(font_spin.value),
+			"root_path": root_le.text.strip_edges(),
+		}
+	
+	return v
+
+func _add_setting_row(parent: VBoxContainer, label: String, control: Control):
+	var hb = HBoxContainer.new()
+	var lbl = Label.new(); lbl.text = label
+	lbl.add_theme_font_size_override("font_size", 12)
+	hb.add_child(lbl)
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(control)
+	parent.add_child(hb)

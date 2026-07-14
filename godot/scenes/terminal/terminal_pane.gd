@@ -1,8 +1,6 @@
-extends Control
+extends PaneBody
 class_name TerminalPane
 # godopty Terminal Pane — Control-based node for focus + rendering.
-
-signal title_changed(new_title: String)
 
 const CURSOR_BLINK_INTERVAL = 0.5
 const SCROLL_LINES = 3
@@ -30,18 +28,12 @@ var color_scheme_path: String = "":
 		if _terminal != null:
 			_apply_stored_scheme()
 
-var pane_name := ""
 
 
 @export var shell_command: String = "/bin/bash"
 @export var shell_env := ""
 @export var rows: int = 24
 @export var cols: int = 80
-@export var font_size: int = 14:
-	set(value):
-		font_size = value
-		if _font != null:
-			_recompute_cell_metrics()
 
 @export var font_path: String = "res://fonts/DejaVuSansMono.ttf":
 	set(value):
@@ -67,7 +59,6 @@ var pane_name := ""
 		_sync_interval = 1.0 / target
 
 var _terminal: GodoptyTerminal
-var _font: Font
 var _font_bold: Font
 var _font_italic: Font
 var _cell_cache: Dictionary = {}
@@ -94,7 +85,7 @@ var _search_error: String = ""
 var _sync_interval: float = 1.0 / 60.0
 
 func _ready():
-	add_to_group("panes")
+	super._ready()
 	_terminal = GodoptyTerminal.new()
 	_terminal.name = "GodoptyTerminal"
 	add_child(_terminal)
@@ -138,9 +129,10 @@ func _notification(what):
 	if what == NOTIFICATION_RESIZED: _on_resize()
 
 func _get_layout_state() -> Dictionary:
-	return {
+	var state = super._get_layout_state()
+	state.merge({
 		"shell": shell_command, "rows": rows, "cols": cols,
-		"shell_env": shell_env, "font_size": font_size, "font_path": font_path,
+		"shell_env": shell_env, "font_path": font_path,
 		"color_scheme_path": color_scheme_path,
 		"cursor_shape": cursor_shape, "cursor_blink": cursor_blink,
 		"cursor_blink_speed": cursor_blink_speed, "cursor_color": cursor_color,
@@ -148,39 +140,14 @@ func _get_layout_state() -> Dictionary:
 		"default_fg": default_fg, "default_bg": default_bg,
 		"beam_cursor_width": beam_cursor_width,
 		"underline_cursor_height": underline_cursor_height,
-		"pane_name": pane_name,
-	}
+	})
+	return state
 
 func apply_settings(settings: Dictionary):
-	for key in settings:
-		var v = settings[key]
-		match key:
-			"shell_command":            shell_command = v
-			"shell_env":                shell_env = v
-			"rows":                     rows = v
-			"cols":                     cols = v
-			"font_size":                font_size = v
-			"font_path":                font_path = v
-			"color_scheme_path":        color_scheme_path = v
-			"cursor_shape":             cursor_shape = v
-			"cursor_blink":             cursor_blink = v
-			"cursor_blink_speed":       cursor_blink_speed = v
-			"cursor_color":             cursor_color = v
-			"scroll_lines":             scroll_lines = v
-			"max_fps":                  max_fps = v
-			"default_fg":               default_fg = v
-			"default_bg":               default_bg = v
-			"beam_cursor_width":        beam_cursor_width = v
-			"underline_cursor_height":  underline_cursor_height = v
-			"pane_name":                pane_name = v
-			"focus_border_color":       focus_border_color = v
-			"selection_color":          selection_color = v
-			"scrollback_indicator_color": scrollback_indicator_color = v
+	super.apply_settings(settings)
 	if settings.has("rows") or settings.has("cols"):
 		if _terminal != null:
 			_terminal.resize_grid(rows, cols)
-	if settings.has("pane_name"):
-		title_changed.emit(pane_name if pane_name != "" else shell_command)
 
 func _reload_fonts():
 	_font = _load_font(font_path, "res://fonts/DejaVuSansMono.ttf")
@@ -609,3 +576,187 @@ func _check_click_concept(pos: Vector2):
 						cmd = cmd.replace("{%d}" % gi, result.get_string(gi))
 					_terminal.send_line(cmd)
 			return
+
+func _pane_type() -> String:
+	return "terminal"
+
+func _default_title() -> String:
+	return shell_command.get_file() if shell_command else "terminal"
+
+func _build_pane_settings_ui(panel: Control) -> Control:
+	var v = VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+
+	# ── Shared pane controls ──
+	var name_le = LineEdit.new()
+	name_le.text = pane_name
+	name_le.placeholder_text = _default_title()
+	_make_row(v, "Name:", name_le, panel)
+
+	var font_spin = SpinBox.new()
+	font_spin.min_value = 8; font_spin.max_value = 32
+	font_spin.value = font_size
+	_make_row(v, "Font size:", font_spin, panel)
+
+	v.add_child(HSeparator.new())
+
+	# ── Shell ──
+	var env_te = TextEdit.new()
+	env_te.text = shell_env
+	env_te.placeholder_text = "KEY=value (one per line)"
+	env_te.custom_minimum_size = Vector2(0, 60)
+	env_te.add_theme_font_size_override("font_size", 11)
+	env_te.text_changed.connect(func(): panel._debounce_timer.start())
+	var env_lbl = Label.new()
+	env_lbl.text = "Environment:"
+	env_lbl.add_theme_font_size_override("font_size", 12)
+	v.add_child(env_lbl)
+	v.add_child(env_te)
+
+	v.add_child(HSeparator.new())
+
+	# ── Cursor ──
+	var cursor_shape_opt = OptionButton.new()
+	cursor_shape_opt.add_item("Block (\u2588)")
+	cursor_shape_opt.add_item("Underline (_)")
+	cursor_shape_opt.add_item("Beam (|)")
+	cursor_shape_opt.selected = cursor_shape
+	_make_row(v, "Cursor:", cursor_shape_opt, panel)
+
+	var cursor_blink_cb = CheckBox.new()
+	cursor_blink_cb.text = "Cursor blink"
+	cursor_blink_cb.button_pressed = cursor_blink
+	cursor_blink_cb.toggled.connect(func(_p): panel._debounce_timer.start())
+	v.add_child(cursor_blink_cb)
+
+	var blink_spin = SpinBox.new()
+	blink_spin.min_value = 0.1; blink_spin.max_value = 2.0
+	blink_spin.step = 0.1; blink_spin.value = cursor_blink_speed
+	_make_row(v, "Blink speed:", blink_spin, panel)
+
+	var cursor_color_btn = ColorPickerButton.new()
+	cursor_color_btn.color = cursor_color
+	_make_row(v, "Cursor color:", cursor_color_btn, panel)
+
+	var beam_spin = SpinBox.new()
+	beam_spin.min_value = 1; beam_spin.max_value = 8
+	beam_spin.value = beam_cursor_width
+	_make_row(v, "Beam width:", beam_spin, panel)
+
+	var uline_spin = SpinBox.new()
+	uline_spin.min_value = 1; uline_spin.max_value = 8
+	uline_spin.value = underline_cursor_height
+	_make_row(v, "Underline height:", uline_spin, panel)
+
+	v.add_child(HSeparator.new())
+
+	# ── Grid ──
+	var rows_spin = SpinBox.new()
+	rows_spin.min_value = 10; rows_spin.max_value = 100
+	rows_spin.value = rows
+	_make_row(v, "Rows:", rows_spin, panel)
+
+	var cols_spin = SpinBox.new()
+	cols_spin.min_value = 40; cols_spin.max_value = 200
+	cols_spin.value = cols
+	_make_row(v, "Cols:", cols_spin, panel)
+
+	var scroll_spin = SpinBox.new()
+	scroll_spin.min_value = 1; scroll_spin.max_value = 10
+	scroll_spin.value = scroll_lines
+	_make_row(v, "Scroll lines:", scroll_spin, panel)
+
+	v.add_child(HSeparator.new())
+
+	# ── Appearance ──
+	var fg_btn = ColorPickerButton.new()
+	fg_btn.color = default_fg
+	_make_row(v, "Default FG:", fg_btn, panel)
+
+	var bg_btn = ColorPickerButton.new()
+	bg_btn.color = default_bg
+	_make_row(v, "Default BG:", bg_btn, panel)
+
+	# Font path picker
+	var font_path_cur = font_path
+	var font_btn = Button.new()
+	font_btn.text = font_path_cur.get_file()
+	font_btn.clip_text = true
+	font_btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	font_btn.pressed.connect(func():
+		var dlg = FileDialog.new()
+		dlg.access = FileDialog.ACCESS_FILESYSTEM
+		dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		dlg.current_path = font_path_cur
+		dlg.add_filter("*.ttf", "TrueType Fonts")
+		dlg.file_selected.connect(func(path: String):
+			font_path_cur = path
+			font_btn.text = path.get_file()
+			panel._debounce_timer.start()
+			dlg.queue_free())
+		dlg.canceled.connect(dlg.queue_free)
+		panel.add_child(dlg)
+		dlg.popup_centered())
+	_make_row(v, "Font:", font_btn, panel)
+
+	# Color scheme picker
+	var scheme_path_cur = color_scheme_path
+	var scheme_btn = Button.new()
+	scheme_btn.text = scheme_path_cur.get_file() if scheme_path_cur != "" else "(none)"
+	scheme_btn.clip_text = true
+	scheme_btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	scheme_btn.pressed.connect(func():
+		var dlg = FileDialog.new()
+		dlg.access = FileDialog.ACCESS_FILESYSTEM
+		dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		dlg.current_path = scheme_path_cur
+		dlg.add_filter("*.txt; *.json; *.csv", "Scheme files")
+		dlg.file_selected.connect(func(path: String):
+			scheme_path_cur = path
+			scheme_btn.text = path.get_file()
+			panel._debounce_timer.start()
+			dlg.queue_free())
+		dlg.canceled.connect(dlg.queue_free)
+		panel.add_child(dlg)
+		dlg.popup_centered())
+	_make_row(v, "Color scheme:", scheme_btn, panel)
+
+	# ── Gather func ──
+	panel._gather_func = func():
+		return {
+			"pane_name": name_le.text.strip_edges(),
+			"font_size": int(font_spin.value),
+			"shell_env": env_te.text,
+			"cursor_shape": cursor_shape_opt.selected,
+			"cursor_blink": cursor_blink_cb.button_pressed,
+			"cursor_blink_speed": blink_spin.value,
+			"cursor_color": cursor_color_btn.color,
+			"beam_cursor_width": int(beam_spin.value),
+			"underline_cursor_height": int(uline_spin.value),
+			"rows": int(rows_spin.value),
+			"cols": int(cols_spin.value),
+			"scroll_lines": int(scroll_spin.value),
+			"default_fg": fg_btn.color,
+			"default_bg": bg_btn.color,
+			"font_path": font_path_cur,
+			"color_scheme_path": scheme_path_cur,
+		}
+
+	return v
+
+func _make_row(parent: VBoxContainer, label: String, control: Control, panel: Control):
+	var hb = HBoxContainer.new()
+	var lbl = Label.new(); lbl.text = label
+	lbl.add_theme_font_size_override("font_size", 12)
+	hb.add_child(lbl)
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hb.add_child(control)
+	parent.add_child(hb)
+	if control is SpinBox:
+		control.value_changed.connect(func(_v: float): panel._debounce_timer.start())
+	elif control is LineEdit:
+		control.text_changed.connect(func(_s: String): panel._debounce_timer.start())
+	elif control is OptionButton:
+		control.item_selected.connect(func(_idx: int): panel._debounce_timer.start())
+	elif control is ColorPickerButton:
+		control.color_changed.connect(func(_c: Color): panel._debounce_timer.start())
