@@ -428,16 +428,11 @@ async fn run_terminal_task(
                                 ctx.capture_deadline = Some(deadline);
                                 timeout_sleep.as_mut().reset(deadline);
 
-                                // Don't feed the trigger chunk to grid — but we
-                                // already processed self-contained lines, so the
-                                // trigger line was resolved. Feed only if this
-                                // is the trigger chunk.
-                                // Actually: feed the trigger chunk so the command
-                                // line stays visible; only suppress subsequent output.
-                                feed_grid(&grid, &bytes);
-                                for line in &lines {
-                                    store_line(&grid, line);
-                                }
+                                // Buffer the trigger chunk — don't feed to grid.
+                                // The echo of the command line already reached the grid
+                                // as the user typed. This chunk may contain cat output
+                                // that should be captured, not displayed.
+                                ctx.capture_buffer.push(bytes.clone());
                                 // Skip the rest — we're in capture mode now
                                 continue;
                             }

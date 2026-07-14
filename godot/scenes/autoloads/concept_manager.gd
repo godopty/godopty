@@ -24,14 +24,22 @@ func _merge_concepts() -> Array:
 		var c = user[i]
 		if c is Dictionary:
 			user_map[c.get("name", "")] = i
-	# Merge: start with defaults, override with user entries
+	# Deep-merge: start with default fields, overlay user fields
 	var merged: Array = []
 	for d in defaults:
 		if not (d is Dictionary):
 			continue
 		var name = d.get("name", "")
 		if name in user_map:
-			merged.append(user[user_map[name]])
+			# Start from default, then overlay every user key
+			var entry: Dictionary = d.duplicate(true)
+			var u = user[user_map[name]]
+			if u is Dictionary:
+				for key in u.keys():
+					entry[key] = u[key]
+			# Migrate old default triggers to the new patterns
+			_migrate_trigger(entry, d)
+			merged.append(entry)
 		else:
 			merged.append(d)
 	# Append user-only concepts (not in defaults)
@@ -88,3 +96,18 @@ func save_concepts(concepts: Array):
 	var d = {"concepts": concepts}
 	_write_file(CONCEPTS_FILE, d)
 	concepts_changed.emit()
+
+# Migrate old default trigger patterns to the new ones.
+const TRIGGER_MIGRATIONS := {
+	"cat_command": {"old": "^cat\\s+", "new": "\\bcat\\s+\\S"},
+	"git_diff":     {"old": "^git\\s+diff", "new": "\\bgit\\s+diff"},
+}
+
+func _migrate_trigger(entry: Dictionary, default: Dictionary):
+	var name: String = entry.get("name", "")
+	if not name in TRIGGER_MIGRATIONS:
+		return
+	var mig = TRIGGER_MIGRATIONS[name]
+	var trigger: String = entry.get("trigger", "")
+	if trigger == mig["old"]:
+		entry["trigger"] = mig["new"]
