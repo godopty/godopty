@@ -57,6 +57,7 @@ func update_pane_list(panes: Array):
 		btn.pressed.connect(func(): request_focus.emit(body))
 		row.add_child(btn)
 		var x = Button.new(); x.text = Icons.CLOSE; x.flat = true
+		Icons.style_button(x)
 		x.custom_minimum_size = Vector2(22, 0)
 		x.pressed.connect(func(): request_close.emit(body))
 		row.add_child(x)
@@ -70,6 +71,7 @@ func _add_header(v: VBoxContainer):
 	h.add_child(title)
 	var arrow = Button.new()
 	arrow.text = Icons.COLLAPSE; arrow.name = "SidebarArrow"
+	Icons.style_button(arrow)
 	arrow.custom_minimum_size = Vector2(22, 22)
 	arrow.pressed.connect(_toggle_sidebar)
 	h.add_child(arrow)
@@ -94,12 +96,14 @@ func _add_buttons(v: VBoxContainer):
 		[Icons.RESET + " Reset", func(): request_reset.emit()],
 	]:
 		var btn = Button.new(); btn.text = b[0]
+		Icons.style_button(btn)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(b[1]); v.add_child(btn)
 
 func _add_pane_buttons(v: VBoxContainer):
 	var add_btn = Button.new()
 	add_btn.text = Icons.ADD + " Add Pane"
+	Icons.style_button(add_btn)
 	add_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_btn.pressed.connect(func():
 		var menu = PopupMenu.new()
@@ -131,6 +135,7 @@ func _add_pane_list_ui(v: VBoxContainer):
 func _add_collapsed_button():
 	var btn = Button.new()
 	btn.text = Icons.EXPAND; btn.name = "SidebarCollapsedBtn"
+	Icons.style_button(btn)
 	btn.custom_minimum_size = Vector2(18, 22)
 	btn.offset_left = 1; btn.offset_top = 2
 	btn.offset_right = 19; btn.visible = false
@@ -165,6 +170,7 @@ func _add_profile_section(parent: VBoxContainer):
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(lbl)
 	var save_btn = Button.new(); save_btn.text = Icons.ADD; save_btn.name = "SaveProfileBtn"
+	Icons.style_button(save_btn)
 	save_btn.tooltip_text = "Save current layout as profile"
 	save_btn.flat = true
 	save_btn.custom_minimum_size = Vector2(22, 0)
@@ -193,6 +199,7 @@ func update_profile_list(profiles: Array[Dictionary]):
 		btn.pressed.connect(func(): request_profile.emit(p_name))
 		row.add_child(btn)
 		var x = Button.new(); x.text = Icons.DELETE; x.flat = true
+		Icons.style_button(x)
 		x.custom_minimum_size = Vector2(22, 0)
 		x.pressed.connect(func(): request_delete_profile.emit(i))
 		row.add_child(x)

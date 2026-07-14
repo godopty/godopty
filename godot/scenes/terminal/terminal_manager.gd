@@ -181,12 +181,14 @@ func _add_title_bar(parent: VBoxContainer, title: String, root: Control) -> Labe
 
 	var min_btn = Button.new()
 	min_btn.text = Icons.MINIMIZE; min_btn.focus_mode = Control.FOCUS_NONE
+	Icons.style_button(min_btn)
 	min_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	min_btn.pressed.connect(func(): _toggle_minimize(root, min_btn))
 	btn_hbox.add_child(min_btn)
 
 	var swap_btn = Button.new()
 	swap_btn.text = Icons.SWAP; swap_btn.focus_mode = Control.FOCUS_NONE
+	Icons.style_button(swap_btn)
 	swap_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	# PopupMenu listing all pane types
 	var swap_menu = PopupMenu.new()
@@ -209,12 +211,14 @@ func _add_title_bar(parent: VBoxContainer, title: String, root: Control) -> Labe
 
 	var settings_btn = Button.new()
 	settings_btn.text = Icons.SETTINGS; settings_btn.focus_mode = Control.FOCUS_NONE
+	Icons.style_button(settings_btn)
 	settings_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	settings_btn.pressed.connect(func(): _open_pane_settings(_find_body(root)))
 	btn_hbox.add_child(settings_btn)
 
 	var close_btn = Button.new()
 	close_btn.text = Icons.CLOSE; close_btn.focus_mode = Control.FOCUS_NONE
+	Icons.style_button(close_btn)
 	close_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	close_btn.pressed.connect(func(): _handle_close(_find_body(root)))
 	btn_hbox.add_child(close_btn)

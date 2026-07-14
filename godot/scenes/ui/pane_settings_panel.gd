@@ -52,6 +52,7 @@ func _build_ui():
 	t.add_theme_font_size_override("font_size", 18)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(t)
 	var x = Button.new(); x.text = Icons.CLOSE; x.flat = true
+	Icons.style_button(x)
 	x.pressed.connect(func(): visible = false); h.add_child(x)
 	v.add_child(h)
 	v.add_child(HSeparator.new())

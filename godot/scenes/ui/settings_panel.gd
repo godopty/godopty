@@ -129,6 +129,7 @@ func _add_settings_header(v: VBoxContainer):
 	var t = Label.new(); t.text = "Settings"; t.add_theme_font_size_override("font_size", 18)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL; h.add_child(t)
 	var x = Button.new(); x.text = Icons.CLOSE; x.flat = true
+	Icons.style_button(x)
 	x.pressed.connect(func(): visible = false); h.add_child(x)
 	v.add_child(h)
 
@@ -417,6 +418,7 @@ func _refresh_concept_list():
 		edit_btn.pressed.connect(_show_concept_dialog.bind(i))
 		h.add_child(edit_btn)
 		var del_btn = Button.new(); del_btn.text = Icons.DELETE
+		Icons.style_button(del_btn)
 		del_btn.pressed.connect(func(): _delete_concept(i))
 		h.add_child(del_btn)
 		_concept_list.add_child(h)
