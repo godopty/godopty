@@ -299,6 +299,7 @@ impl GodoptyTerminal {
         if hex_csv.is_empty() {
             grid.palette = godopty_core::color::SYSTEM_COLORS;
             grid.generation += 1;
+            grid.palette_changed = true;
             return;
         }
         let s = hex_csv.to_string();
@@ -318,6 +319,7 @@ impl GodoptyTerminal {
         }
         if changed {
             grid.generation += 1;
+            grid.palette_changed = true;
         }
     }
 

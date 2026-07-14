@@ -109,6 +109,8 @@ pub struct TermGrid {
     rows: usize,
     cols: usize,
     pub generation: u64,
+    /// Set to true after calling set_palette; forces next get_grid_updates to return Full.
+    pub palette_changed: bool,
     pub palette: [[u8; 3]; 16],
     /// Line counter for history storage (monotonically increasing).
     line_count: u64,
@@ -128,8 +130,8 @@ impl TermGrid {
         let listener = TitleListener { title: Arc::clone(&title) };
         let term = Term::new(config, &size, listener);
         let processor = vte::ansi::Processor::new();
+        Self { term, processor, title, rows, cols, generation: 0, palette_changed: false, palette: crate::color::SYSTEM_COLORS, line_count: 0, history: None }
 
-        Self { term, processor, title, rows, cols, generation: 0, palette: crate::color::SYSTEM_COLORS, line_count: 0, history: None }
     }
 
     /// Feed raw PTY output bytes into the terminal state machine.
@@ -168,10 +170,9 @@ impl TermGrid {
 
         rows
     }
-
-    /// Fetch damaged cells since the last clear, or a full grid if forced.
     pub fn get_grid_updates(&mut self, force_full: bool) -> GridUpdate {
-        if force_full {
+        if force_full || self.palette_changed {
+            self.palette_changed = false;
             self.term.reset_damage();
             return GridUpdate::Full(self.renderable_rows());
         }
