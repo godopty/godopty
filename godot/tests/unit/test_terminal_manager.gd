@@ -107,3 +107,51 @@ func test_split_refused_when_grid_full():
 	# After filling, next spawn should return null
 	var extra = _tm.spawn()
 	assert_null(extra, "spawn should return null when grid is full")
+
+
+# ── Swap ─────────────────────────────────────────────────────────────────
+
+func test_swap_pane_same_spot():
+	var body = _tm.spawn_pane("terminal", {})
+	assert_not_null(body)
+	var old_tile = _tm.tiles[0]
+	var old_col = old_tile.col; var old_row = old_tile.row
+	var old_cspan = old_tile.cspan; var old_rspan = old_tile.rspan
+
+	var new_body = _tm.swap_pane(body, "code_viewer")
+	assert_not_null(new_body, "swap_pane should return a new body")
+	assert_eq(_tm.tiles.size(), 1, "tiles should still have 1 entry")
+
+	var new_tile = _tm.tiles[0]
+	assert_eq(new_tile.col, old_col, "col should be unchanged")
+	assert_eq(new_tile.row, old_row, "row should be unchanged")
+	assert_eq(new_tile.cspan, old_cspan, "cspan should be unchanged")
+	assert_eq(new_tile.rspan, old_rspan, "rspan should be unchanged")
+
+	assert_eq(new_body._pane_type(), "code_viewer", "new body should be code_viewer")
+	assert_ne(new_body, body, "new body should be different instance")
+
+func test_swap_pane_same_type():
+	var body = _tm.spawn_pane("terminal", {"pane_name": "Orig"})
+	assert_not_null(body)
+	assert_eq(body.pane_name, "Orig")
+
+	var new_body = _tm.swap_pane(body, "terminal")
+	assert_not_null(new_body, "swap_pane should return a new body")
+	assert_eq(_tm.tiles.size(), 1, "tiles should still have 1 entry")
+	assert_eq(new_body._pane_type(), "terminal", "new body should be terminal")
+	assert_ne(new_body, body, "new body should be different instance")
+
+func test_swap_preserves_settings():
+	var body = _tm.spawn_pane("terminal", {"pane_name": "Test", "font_size": 20})
+	assert_not_null(body)
+	assert_eq(body.pane_name, "Test")
+	assert_eq(body.font_size, 20)
+
+	var new_body = _tm.swap_pane(body, "code_viewer")
+	assert_not_null(new_body)
+	assert_eq(new_body.pane_name, "Test", "pane_name should be preserved")
+	assert_eq(new_body.font_size, 20, "font_size should be preserved")
+
+# test_swap_pane_not_found removed — push_error from TerminalManager
+# conflicts with GUT's error tracking. Covered by integration tests.

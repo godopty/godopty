@@ -80,3 +80,23 @@ func test_pane_name_overrides_title():
 	assert_not_null(lbl)
 	# The title label shows the title_label from opts
 	assert_string_contains(lbl.text, "MyTerm")
+
+
+# ── Swap via TerminalManager ──────────────────────────────────────────
+
+func test_swap_pane_preserves_tile():
+	var body = _tm.spawn_pane("terminal", {"pane_name": "Before"})
+	assert_not_null(body)
+	assert_eq(_tm.tiles.size(), 1)
+
+	_tm.on_swap = func(b: Control, t: String):
+		_tm.swap_pane(b, t)
+
+	# Simulate what _handle_swap does
+	_tm.on_swap.call(body, "code_viewer")
+
+	assert_eq(_tm.tiles.size(), 1, "tiles should still have 1 entry after swap")
+	var new_body = _tm._find_body(_tm.tiles[0].wrapper)
+	assert_not_null(new_body, "new body should exist in tile")
+	assert_eq(new_body._pane_type(), "code_viewer", "swapped body should be code_viewer")
+	assert_eq(new_body.pane_name, "Before", "pane_name should be preserved across swap")
