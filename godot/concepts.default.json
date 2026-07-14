@@ -1,0 +1,26 @@
+{
+  "concepts": [
+    {
+      "name": "cat_command",
+      "trigger": "^cat\\s+",
+      "enabled": true,
+      "capture_mode": "until_stop",
+      "stop_timeout_ms": 300,
+      "stop_on_input": true,
+      "actions": [
+        {"cmd": "", "target": "code_viewer"}
+      ]
+    },
+    {
+      "name": "git_diff",
+      "trigger": "^git\\s+diff",
+      "enabled": false,
+      "capture_mode": "until_stop",
+      "stop_timeout_ms": 500,
+      "stop_on_input": true,
+      "actions": [
+        {"cmd": "", "target": "code_viewer"}
+      ]
+    }
+  ]
+}

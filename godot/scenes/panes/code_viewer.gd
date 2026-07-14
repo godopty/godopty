@@ -39,6 +39,12 @@ func load_file(path: String):
 		"rs": _editor.add_comment_string("//")
 		"c", "cpp", "h", "hpp": _editor.add_comment_string("//")
 
+
+/// Receive text content from concept routing (e.g., captured command output).
+/// Replaces the editor content and scrolls to the top.
+func receive_content(text: String):
+	_editor.text = text
+	_editor.set_caret_line(0)
 func _pane_type() -> String:
 	return "code_viewer"
 

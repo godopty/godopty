@@ -408,11 +408,26 @@ func _refresh_concept_list():
 	var concepts = _concept_terminal.get_global_concepts() if _concept_terminal else []
 	for i in concepts.size():
 		var c = concepts[i]
+		var enabled: bool = c.get("enabled", true)
 		var h = HBoxContainer.new()
+		# Enabled toggle
+		var toggle = CheckButton.new()
+		toggle.button_pressed = enabled
+		toggle.toggled.connect(func(on: bool):
+			c["enabled"] = on
+			var all = _concept_terminal.get_global_concepts()
+			if i < all.size():
+				all[i]["enabled"] = on
+			_concept_terminal.set_global_concepts(all)
+			ConceptManager.save_concepts(all)
+		)
+		h.add_child(toggle)
 		var lbl = Label.new()
 		lbl.text = "%s  →  %s" % [c.get("name", "?"), c.get("trigger", "?")]
 		lbl.add_theme_font_size_override("font_size", 11)
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if not enabled:
+			lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 		h.add_child(lbl)
 		var edit_btn = Button.new(); edit_btn.text = "Edit"
 		edit_btn.pressed.connect(_show_concept_dialog.bind(i))
@@ -432,31 +447,73 @@ func _show_concept_dialog(idx: int):
 	var regex_le = LineEdit.new(); regex_le.placeholder_text = "Regex trigger"
 	var cmd_le = LineEdit.new(); cmd_le.placeholder_text = "Action command"
 	var target_le = LineEdit.new(); target_le.placeholder_text = "Target label"
+	var enabled_cb = CheckButton.new(); enabled_cb.text = "Enabled"
+	enabled_cb.button_pressed = true
+	# Capture mode selector
+	var mode_opt = OptionButton.new()
+	mode_opt.add_item("Single line")
+	mode_opt.add_item("Capture until stop")
+	var timeout_spin = SpinBox.new()
+	timeout_spin.min_value = 50; timeout_spin.max_value = 5000
+	timeout_spin.step = 50; timeout_spin.value = 300
+	var stop_on_input_cb = CheckButton.new(); stop_on_input_cb.text = "Stop on input"
+	stop_on_input_cb.button_pressed = true
+	timeout_spin.visible = false; stop_on_input_cb.visible = false
+	mode_opt.item_selected.connect(func(sel: int):
+		timeout_spin.visible = (sel == 1)
+		stop_on_input_cb.visible = (sel == 1)
+	)
 	if idx >= 0 and _concept_terminal:
 		var concepts = _concept_terminal.get_global_concepts()
 		if idx < concepts.size():
 			var c = concepts[idx]
 			name_le.text = c.get("name", "")
 			regex_le.text = c.get("trigger", "")
+			enabled_cb.button_pressed = c.get("enabled", true)
 			var acts = c.get("actions", [])
 			if acts.size() > 0:
 				cmd_le.text = acts[0].get("cmd", "")
 				target_le.text = acts[0].get("target", "")
+			var cap_mode = c.get("capture_mode", "single_line")
+			if cap_mode == "until_stop":
+				mode_opt.selected = 1
+				timeout_spin.visible = true
+				stop_on_input_cb.visible = true
+				timeout_spin.value = c.get("stop_timeout_ms", 300)
+				stop_on_input_cb.button_pressed = c.get("stop_on_input", true)
+			else:
+				mode_opt.selected = 0
 	v.add_child(_lbl("Name:")); v.add_child(name_le)
 	v.add_child(_lbl("Regex:")); v.add_child(regex_le)
 	v.add_child(_lbl("Command:")); v.add_child(cmd_le)
 	v.add_child(_lbl("Target:")); v.add_child(target_le)
+	v.add_child(enabled_cb)
+	v.add_child(_lbl("Capture mode:")); v.add_child(mode_opt)
+	v.add_child(timeout_spin)
+	v.add_child(stop_on_input_cb)
 	dlg.confirmed.connect(func():
-		_save_concept(idx, name_le.text, regex_le.text, cmd_le.text, target_le.text)
+		var capture_mode = "until_stop" if mode_opt.selected == 1 else "single_line"
+		_save_concept(idx, name_le.text, regex_le.text, cmd_le.text, target_le.text,
+			enabled_cb.button_pressed, capture_mode, int(timeout_spin.value), stop_on_input_cb.button_pressed)
 		dlg.queue_free()
 	)
 	add_child(dlg)
 	dlg.popup_centered()
-
-func _save_concept(idx: int, p_name: String, regex_pat: String, cmd: String, target: String):
+func _save_concept(idx: int, p_name: String, regex_pat: String, cmd: String, target: String,
+	p_enabled: bool = true, p_capture_mode: String = "single_line",
+	stop_ms: int = 300, stop_input: bool = true):
 	if not _concept_terminal: return
 	var concepts = _concept_terminal.get_global_concepts()
-	var entry = {"name": p_name, "trigger": regex_pat, "actions": [{"cmd": cmd, "target": target}]}
+	var entry: Dictionary = {
+		"name": p_name,
+		"trigger": regex_pat,
+		"enabled": p_enabled,
+		"capture_mode": p_capture_mode,
+		"actions": [{"cmd": cmd, "target": target}],
+	}
+	if p_capture_mode == "until_stop":
+		entry["stop_timeout_ms"] = stop_ms
+		entry["stop_on_input"] = stop_input
 	if idx >= 0 and idx < concepts.size():
 		concepts[idx] = entry
 	else:

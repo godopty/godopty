@@ -403,7 +403,44 @@ func _process(_delta: float):
 			fetch_ms = body.get("_fetch_ms") if "_fetch_ms" in body else -1
 			draw_ms = body.get("_draw_ms") if "_draw_ms" in body else -1
 		_sidebar.update_fps(fps, fetch_ms, draw_ms)
+	# Concept event polling
+	_poll_concept_events()
 
+# ═══════════════════════════════════════════════════════════════════════
+# Concept event routing
+# ═══════════════════════════════════════════════════════════════════════
+
+func _poll_concept_events():
+	for t in _tm.tiles:
+		var body = _tm._find_body(t.wrapper)
+		if not body or not body is TerminalPane:
+			continue
+		var term = body.get("_terminal")
+		if term == null:
+			continue
+		var events = term.drain_concept_events()
+		for ev in events:
+			if not (ev is Dictionary):
+				continue
+			route_concept_event(term, ev)
+
+func route_concept_event(source_term, ev: Dictionary):
+	var target_type: String = ev.get("target_pane_type", "")
+	var receiver = _find_pane_of_type(target_type)
+	if receiver and receiver.has_method("receive_content"):
+		var lines: PackedStringArray = ev.get("lines", PackedStringArray())
+		receiver.receive_content("\n".join(lines))
+		source_term.acknowledge_capture(ev.get("id", 0))
+	else:
+		ToastManager.warn("No %s pane open for '%s' output" % [target_type, ev.get("concept_name", "")])
+		source_term.flush_capture(ev.get("id", 0))
+
+func _find_pane_of_type(type_name: String) -> Control:
+	for t in _tm.tiles:
+		var body = _tm._find_body(t.wrapper)
+		if body and body._pane_type() == type_name:
+			return body
+	return null
 func _toggle_settings():
 	if _settings_panel == null:
 		_settings_panel = SettingsPanel.new(self)
