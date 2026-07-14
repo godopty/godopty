@@ -8,8 +8,7 @@ arch=('x86_64')
 url="https://github.com/you/godopty"
 license=('Apache-2.0')
 depends=()
-source=("$pkgname-$pkgver::$url/releases/download/v$pkgver/godopty-linux-x86_64"
-        "godopty.desktop")
+source=("$pkgname-$pkgver::$url/releases/download/v$pkgver/godopty-v$pkgver-linux-x86_64"
 sha256sums=('SKIP'
             'SKIP')
 

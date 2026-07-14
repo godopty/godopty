@@ -93,6 +93,8 @@ jobs:
     container: barichello/godot-ci:4.3
     permissions:
       contents: write
+    env:
+      VERSION: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,15 +118,15 @@ jobs:
       - name: Export Linux
         run: |
           mkdir -p dist
-          godot --headless --path godot --export-release "Linux/X11" dist/godopty-linux-x86_64
+          godot --headless --path godot --export-release "Linux/X11" "dist/godopty-${VERSION}-linux-x86_64"
 
       - name: Export Windows
         run: |
-          godot --headless --path godot --export-release "Windows Desktop" dist/godopty-windows-x86_64.exe
+          godot --headless --path godot --export-release "Windows Desktop" "dist/godopty-${VERSION}-windows-x86_64.exe"
 
       - name: Export macOS
         run: |
-          godot --headless --path godot --export-release "macOS" dist/godopty-macos-arm64.zip
+          godot --headless --path godot --export-release "macOS" "dist/godopty-${VERSION}-macos-arm64.zip"
 
       - name: Copy GDExtension artifacts for release
         run: |
@@ -135,8 +137,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/godopty-linux-x86_64
-            dist/godopty-windows-x86_64.exe
-            dist/godopty-macos-arm64.zip
+            dist/godopty-${VERSION}-linux-x86_64
+            dist/godopty-${VERSION}-windows-x86_64.exe
+            dist/godopty-${VERSION}-macos-arm64.zip
             dist/gdextension/*
           generate_release_notes: true
