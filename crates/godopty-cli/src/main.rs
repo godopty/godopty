@@ -13,7 +13,7 @@
 
 use godopty_core::engine::WorkspaceEngine;
 use godopty_core::term::TermGrid;
-use godopty_core::types::{Action, Concept, TerminalConfig};
+use godopty_core::types::{Action, CaptureMode, Concept, TerminalConfig};
 use regex::Regex;
 
 // ── Demo constants ─────────────────────────────────────────────────────
@@ -99,6 +99,7 @@ async fn run_pty_demo() {
             TerminalConfig { id: 1, labels: vec!["backend".into()] },
             "/bin/bash",
             &["--norc"],
+            &[],
         )
         .await
         .expect("Failed to spawn PTY for Terminal 1");
@@ -108,6 +109,7 @@ async fn run_pty_demo() {
             TerminalConfig { id: 2, labels: vec!["observer".into()] },
             "/bin/bash",
             &["--norc"],
+            &[],
         )
         .await
         .expect("Failed to spawn PTY for Terminal 2");
@@ -196,6 +198,8 @@ fn build_concepts() -> Vec<Concept> {
         Concept {
             name: "crash_detected".into(),
             trigger_regex: Regex::new(r"(?i)crash|panic|segfault|SIGSEGV").expect("invalid crash_detected regex"),
+            enabled: true,
+            capture_mode: CaptureMode::SingleLine,
             destinations: vec![Action {
                 command_template: "echo '[Auto] Restart attempt triggered by crash'".into(),
                 target_label: "backend".into(),
@@ -204,6 +208,8 @@ fn build_concepts() -> Vec<Concept> {
         Concept {
             name: "port_conflict".into(),
             trigger_regex: Regex::new(r"(?i)address.*already.*in\s*use").expect("invalid port_conflict regex"),
+            enabled: true,
+            capture_mode: CaptureMode::SingleLine,
             destinations: vec![Action {
                 command_template: "echo '[Auto] Port conflict detected — consider lsof -i'".into(),
                 target_label: "observer".into(),

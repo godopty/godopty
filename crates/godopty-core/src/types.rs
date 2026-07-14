@@ -5,6 +5,26 @@
 //! terminal tasks. Every type is `Clone` so it can be fanned out to
 //! multiple receivers.
 
+
+/// How a triggered concept captures terminal output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureMode {
+    /// Match and capture only the triggering line (backward-compatible default).
+    SingleLine,
+    /// Capture all subsequent output until stop conditions are met.
+    UntilStop {
+        /// Silence for this many ms stops the capture.
+        stop_timeout_ms: u64,
+        /// User typing a command stops the capture.
+        stop_on_input: bool,
+    },
+}
+
+impl Default for CaptureMode {
+    fn default() -> Self {
+        Self::SingleLine
+    }
+}
 use regex::Regex;
 
 /// Identifies and labels a distinct terminal pane.
@@ -63,5 +83,40 @@ pub struct Action {
 pub struct Concept {
     pub name: String,
     pub trigger_regex: Regex,
+    /// Whether this concept is active. Disabled concepts are never evaluated.
+    pub enabled: bool,
+    /// How output is captured when this concept triggers.
+    pub capture_mode: CaptureMode,
     pub destinations: Vec<Action>,
+}
+
+impl Concept {
+    /// Convenience constructor with reasonable defaults.
+    pub fn new(name: &str, trigger_regex: Regex, destinations: Vec<Action>) -> Self {
+        Self {
+            name: name.to_string(),
+            trigger_regex,
+            enabled: true,
+            capture_mode: CaptureMode::default(),
+            destinations,
+        }
+    }
+}
+
+/// A completed capture produced by a `UntilStop` concept match.
+///
+/// Emitted once the stop condition fires (timeout or user input).
+/// The `lines` contain the plain-text output captured between the
+/// trigger and the stop. The GDScript layer decides whether to route
+/// this to a receiver pane or flush it back to the terminal grid.
+#[derive(Debug, Clone)]
+pub struct CapturedOutput {
+    /// Monotonically increasing per-terminal capture ID.
+    pub id: u64,
+    /// The concept that triggered this capture.
+    pub concept_name: String,
+    /// Plain-text lines captured between trigger and stop.
+    pub lines: Vec<String>,
+    /// Which pane type this output should be routed to.
+    pub target_pane_type: String,
 }
