@@ -50,6 +50,7 @@ static ENGINE: LazyLock<WorkspaceEngine> =
 struct GodoptyTerminal {
     spawned: Option<SpawnedTerminal>,
     next_id: u32,
+    capture_queue: Option<Arc<std::sync::Mutex<Vec<godopty_core::types::CapturedOutput>>>>,
 }
 
 #[godot_api]
@@ -58,6 +59,7 @@ impl INode2D for GodoptyTerminal {
         Self {
             spawned: None,
             next_id: 1,
+            capture_queue: None,
         }
     }
 }
@@ -117,6 +119,7 @@ impl GodoptyTerminal {
                         }
                     }
                 }
+                self.capture_queue = Some(Arc::clone(&spawned.capture_queue));
                 self.spawned = Some(spawned);
             }
             Err(e) => {
@@ -568,16 +571,37 @@ impl GodoptyTerminal {
 
 	/// Replace all concepts in the global engine.
 	/// `concepts_array` is an Array of Dictionaries, each with:
-	///   "name": String, "trigger": String (regex), "actions": Array[{"cmd":String,"target":String}]
+	///   "name": String, "trigger": String (regex),
+	///   "enabled": bool, "capture_mode": String,
+	///   "stop_timeout_ms": int, "stop_on_input": bool,
+	///   "actions": Array[{"cmd":String,"target":String}]
 	#[func]
 	fn set_global_concepts(&self, concepts_array: Array<Variant>) {
-		use godopty_core::types::{Concept, Action};
+		use godopty_core::types::{CaptureMode, Concept, Action};
 		let mut concepts = Vec::new();
 		for item in concepts_array.iter_shared() {
 			let obj: Dictionary<Variant, Variant> = item.to();
 			let name = obj.get("name").and_then(|v| v.try_to::<GString>().ok()).map(|s| s.to_string()).unwrap_or_default();
 			let trigger = obj.get("trigger").and_then(|v| v.try_to::<GString>().ok()).map(|s| s.to_string()).unwrap_or_default();
 			let Ok(re) = regex::Regex::new(&trigger) else { continue; };
+			let enabled = obj.get("enabled")
+				.and_then(|v| v.try_to::<bool>().ok())
+				.unwrap_or(true);
+			let capture_mode = obj.get("capture_mode")
+				.and_then(|v| v.try_to::<GString>().ok())
+				.map(|s| s.to_string())
+				.unwrap_or_default();
+			let cap_mode = if capture_mode == "until_stop" {
+				let stop_ms = obj.get("stop_timeout_ms")
+					.and_then(|v| v.try_to::<i64>().ok())
+					.unwrap_or(300) as u64;
+				let stop_input = obj.get("stop_on_input")
+					.and_then(|v| v.try_to::<bool>().ok())
+					.unwrap_or(true);
+				CaptureMode::UntilStop { stop_timeout_ms: stop_ms, stop_on_input: stop_input }
+			} else {
+				CaptureMode::SingleLine
+			};
 			let mut actions = Vec::new();
 			if let Some(acts) = obj.get("actions").and_then(|v| v.try_to::<Array<Variant>>().ok()) {
 				for a in acts.iter_shared() {
@@ -587,19 +611,31 @@ impl GodoptyTerminal {
 					actions.push(Action { command_template: cmd, target_label: target });
 				}
 			}
-			concepts.push(Concept { name, trigger_regex: re, destinations: actions });
+			concepts.push(Concept { name, trigger_regex: re, enabled, capture_mode: cap_mode, destinations: actions });
 		}
 		ENGINE.set_concepts(concepts);
 	}
 	/// Get all concepts as an Array of Dictionaries.
 	#[func]
 	fn get_global_concepts(&self) -> Array<Variant> {
+		use godopty_core::types::CaptureMode;
 		let concepts = ENGINE.get_concepts();
 		let mut arr = Array::<Variant>::new();
 		for c in &concepts {
 			let mut obj = Dictionary::<Variant, Variant>::new();
 			obj.set("name", &Variant::from(c.name.clone()));
 			obj.set("trigger", &Variant::from(c.trigger_regex.as_str()));
+			obj.set("enabled", &Variant::from(c.enabled));
+			match &c.capture_mode {
+				CaptureMode::SingleLine => {
+					obj.set("capture_mode", &Variant::from("single_line"));
+				}
+				CaptureMode::UntilStop { stop_timeout_ms, stop_on_input } => {
+					obj.set("capture_mode", &Variant::from("until_stop"));
+					obj.set("stop_timeout_ms", &Variant::from(*stop_timeout_ms as i64));
+					obj.set("stop_on_input", &Variant::from(*stop_on_input));
+				}
+			}
 			let mut acts = Array::<Variant>::new();
 			for a in &c.destinations {
 				let mut ad = Dictionary::<Variant, Variant>::new();
@@ -611,6 +647,53 @@ impl GodoptyTerminal {
 			arr.push(&Variant::from(obj));
 		}
 		arr
+	}
+
+	/// Drain all completed capture events from this terminal's queue.
+	///
+	/// Returns an Array of Dictionaries with keys:
+	/// - `id` (int): capture ID for acknowledge/flush
+	/// - `concept_name` (String)
+	/// - `lines` (PackedStringArray): captured output lines
+	/// - `target_pane_type` (String)
+	#[func]
+	fn drain_concept_events(&self) -> Array<Variant> {
+		let mut arr = Array::<Variant>::new();
+		if let Some(ref queue) = self.capture_queue {
+			if let Ok(mut events) = queue.lock() {
+				for ev in events.drain(..) {
+					let mut obj = Dictionary::<Variant, Variant>::new();
+					obj.set("id", &Variant::from(ev.id as i64));
+					obj.set("concept_name", &Variant::from(ev.concept_name));
+					let lines_arr = PackedStringArray::from_iter(ev.lines.iter().map(|s| GString::from(s)));
+					obj.set("lines", &Variant::from(lines_arr));
+					obj.set("target_pane_type", &Variant::from(ev.target_pane_type));
+					arr.push(&Variant::from(obj));
+				}
+			}
+		}
+		arr
+	}
+
+	/// Acknowledge that GDScript routed a capture to a receiver.
+	///
+	/// Discards the buffered raw bytes — they will NOT appear on the terminal.
+	#[func]
+	fn acknowledge_capture(&self, event_id: i64) {
+		if let Some(ref spawned) = self.spawned {
+			spawned.handle.acknowledge_capture(event_id as u64);
+		}
+	}
+
+	/// Flush a capture's buffered bytes to the terminal grid.
+	///
+	/// Called when no receiver pane was available — the output
+	/// appears normally on the terminal.
+	#[func]
+	fn flush_capture(&self, event_id: i64) {
+		if let Some(ref spawned) = self.spawned {
+			spawned.handle.flush_capture(event_id as u64);
+		}
 	}
 
 }
