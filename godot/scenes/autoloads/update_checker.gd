@@ -6,6 +6,8 @@ const REPO_OWNER := "you"
 const REPO_NAME := "godopty"
 const RELEASES_URL := "https://api.github.com/repos/%s/%s/releases/latest"
 
+const REQUEST_TIMEOUT := 5.0
+
 var _http: HTTPRequest
 
 func _ready():
@@ -22,14 +24,27 @@ func _check():
 	if OS.get_executable_path().begins_with("/usr/"):
 		return
 	_http = HTTPRequest.new()
+	_http.timeout = REQUEST_TIMEOUT
 	add_child(_http)
 	_http.request_completed.connect(_on_response.bind(current))
 	var url = RELEASES_URL % [REPO_OWNER, REPO_NAME]
-	_http.request(url, ["Accept: application/vnd.github+json"])
+	var err = _http.request(url, ["Accept: application/vnd.github+json"])
+	if err != OK:
+		_http.queue_free()
 
 func _on_response(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, current: String):
+	# Always clean up the HTTPRequest node — success or failure.
+	_http.queue_free()
+
+	# result != 0 means network-level failure: offline, DNS error, timeout, etc.
+	# Degrade silently — the user is offline, nothing we can do.
+	if result != HTTPRequest.RESULT_SUCCESS:
+		return
+
+	# GitHub may rate-limit or return non-200. Degrade silently.
 	if code != 200:
 		return
+
 	var json = JSON.parse_string(body.get_string_from_utf8())
 	if json == null:
 		return
@@ -37,15 +52,10 @@ func _on_response(result: int, code: int, _headers: PackedStringArray, body: Pac
 	if latest == "" or latest == current:
 		return
 
-	# Compare semver — only notify if strictly newer
 	if not _is_newer(latest, current):
 		return
 
-	var html_url = json.get("html_url", "https://github.com/%s/%s/releases" % [REPO_OWNER, REPO_NAME])
 	ToastManager.info("Update available: v%s → v%s" % [current, latest])
-	# TODO: add clickable link or dialog to open html_url
-
-	_http.queue_free()
 
 func _is_newer(latest: String, current: String) -> bool:
 	var la = latest.split(".")
