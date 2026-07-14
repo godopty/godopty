@@ -99,8 +99,8 @@ func save_concepts(concepts: Array):
 
 # Migrate old default trigger patterns to the new ones.
 const TRIGGER_MIGRATIONS := {
-	"cat_command": {"old": "^cat\\s+", "new": "\\bcat\\s+\\S"},
-	"git_diff":     {"old": "^git\\s+diff", "new": "\\bgit\\s+diff"},
+	"cat_command": {"old": ["^cat\\s+", "\\bcat\\s+\\S"], "new": "(?:^|[$#>]\\s)\\bcat\\s+\\S"},
+	"git_diff":     {"old": ["^git\\s+diff", "\\bgit\\s+diff"], "new": "(?:^|[$#>]\\s)\\bgit\\s+diff"},
 }
 
 func _migrate_trigger(entry: Dictionary, default: Dictionary):
@@ -109,5 +109,6 @@ func _migrate_trigger(entry: Dictionary, default: Dictionary):
 		return
 	var mig = TRIGGER_MIGRATIONS[name]
 	var trigger: String = entry.get("trigger", "")
-	if trigger == mig["old"]:
+	var olds: Array = mig["old"] if mig["old"] is Array else [mig["old"]]
+	if trigger in olds:
 		entry["trigger"] = mig["new"]

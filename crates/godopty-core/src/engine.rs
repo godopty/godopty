@@ -326,24 +326,26 @@ fn handle_command(input: &StdinInput, grid: &Option<Arc<Mutex<TermGrid>>>, captu
         StdinInput::AcknowledgeCapture(id) => {
             if let Ok(mut bufs) = capture_buffers.lock() {
                 if let Some(chunks) = bufs.remove(id) {
-                    // Find the raw bytes after the last \n — this is the
-                    // shell prompt (which has no trailing newline and was
-                    // never emitted by the line parser).
                     let mut all_bytes: Vec<u8> = Vec::new();
                     for chunk in &chunks {
                         all_bytes.extend_from_slice(chunk);
                     }
+                    // The shell prompt has no trailing newline and was
+                    // never emitted by the line parser. Extract the raw
+                    // bytes after the last \n and feed them to the grid.
                     if let Some(pos) = all_bytes.iter().rposition(|&b| b == b'\n') {
                         let prompt_bytes = &all_bytes[pos + 1..];
                         if !prompt_bytes.is_empty() {
                             feed_grid(grid, prompt_bytes);
-                            // Also parse any partial line for history storage
                             let mut lp = crate::parser::LineParser::new();
                             let parsed = lp.feed(prompt_bytes);
                             for line in &parsed {
                                 store_line(grid, line);
                             }
                         }
+                    } else {
+                        // No newline at all — entire buffer is the prompt
+                        feed_grid(grid, &all_bytes);
                     }
                 }
             }
@@ -351,7 +353,6 @@ fn handle_command(input: &StdinInput, grid: &Option<Arc<Mutex<TermGrid>>>, captu
         _ => {}
     }
 }
-
 /// Check whether the active capture concept has `stop_on_input` set.
 fn capture_stops_on_input(ctx: &TaskContext) -> bool {
     if let Some(ref name) = ctx.active_capture_name {
