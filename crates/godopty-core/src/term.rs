@@ -111,6 +111,8 @@ pub struct TermGrid {
     pub generation: u64,
     /// Set to true after calling set_palette; forces next get_grid_updates to return Full.
     pub palette_changed: bool,
+    /// Tracks the display_offset last used for a Full grid render; forces Full when it changes.
+    last_full_offset: usize,
     pub palette: [[u8; 3]; 16],
     /// Line counter for history storage (monotonically increasing).
     line_count: u64,
@@ -130,7 +132,7 @@ impl TermGrid {
         let listener = TitleListener { title: Arc::clone(&title) };
         let term = Term::new(config, &size, listener);
         let processor = vte::ansi::Processor::new();
-        Self { term, processor, title, rows, cols, generation: 0, palette_changed: false, palette: crate::color::SYSTEM_COLORS, line_count: 0, history: None }
+        Self { term, processor, title, rows, cols, generation: 0, palette_changed: false, last_full_offset: 0, palette: crate::color::SYSTEM_COLORS, line_count: 0, history: None }
 
     }
 
@@ -171,16 +173,21 @@ impl TermGrid {
         rows
     }
     pub fn get_grid_updates(&mut self, force_full: bool) -> GridUpdate {
-        if force_full || self.palette_changed {
+        let offset_changed = self.term.grid().display_offset() as usize != self.last_full_offset;
+        if force_full || self.palette_changed || offset_changed {
             self.palette_changed = false;
             self.term.reset_damage();
-            return GridUpdate::Full(self.renderable_rows());
+            let rows = self.renderable_rows();
+            self.last_full_offset = self.term.grid().display_offset() as usize;
+            return GridUpdate::Full(rows);
         }
 
         let damage: Vec<_> = match self.term.damage() {
             alacritty_terminal::term::TermDamage::Full => {
                 self.term.reset_damage();
-                return GridUpdate::Full(self.renderable_rows());
+                let rows = self.renderable_rows();
+                self.last_full_offset = self.term.grid().display_offset() as usize;
+                return GridUpdate::Full(rows);
             }
             alacritty_terminal::term::TermDamage::Partial(iter) => iter.collect(),
         };
