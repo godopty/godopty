@@ -145,8 +145,7 @@ func _get_layout_state() -> Dictionary:
 
 func apply_settings(settings: Dictionary):
 	# Restore serialized Color values from JSON round-trips.
-	# Layout JSON stores Colors as "(r, g, b, a)" strings; Godot's
-	# Color(string) constructor doesn't handle the surrounding parens.
+	# Layout JSON stores Colors as "(r, g, b, a)" strings.
 	_restore_color_strings(settings)
 	super.apply_settings(settings)
 	if settings.has("rows") or settings.has("cols"):
@@ -692,20 +691,20 @@ func _build_pane_settings_ui(panel: Control) -> Control:
 	bg_btn.color = default_bg
 	_make_row(v, "Default BG:", bg_btn, panel)
 
-	# Font path picker
-	var font_path_cur = font_path
+	# Font path picker — stored as metadata to avoid closure capture issues
 	var font_btn = Button.new()
-	font_btn.text = font_path_cur.get_file()
+	font_btn.text = font_path.get_file()
+	font_btn.set_meta("path", font_path)
 	font_btn.clip_text = true
 	font_btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	font_btn.pressed.connect(func():
 		var dlg = FileDialog.new()
 		dlg.access = FileDialog.ACCESS_FILESYSTEM
 		dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-		dlg.current_path = font_path_cur
+		dlg.current_path = font_btn.get_meta("path", "")
 		dlg.add_filter("*.ttf", "TrueType Fonts")
 		dlg.file_selected.connect(func(path: String):
-			font_path_cur = path
+			font_btn.set_meta("path", path)
 			font_btn.text = path.get_file()
 			panel._debounce_timer.start()
 			dlg.queue_free())
@@ -714,20 +713,20 @@ func _build_pane_settings_ui(panel: Control) -> Control:
 		dlg.popup_centered())
 	_make_row(v, "Font:", font_btn, panel)
 
-	# Color scheme picker
-	var scheme_path_cur = color_scheme_path
+	# Color scheme picker — stored as metadata to avoid closure capture issues
 	var scheme_btn = Button.new()
-	scheme_btn.text = scheme_path_cur.get_file() if scheme_path_cur != "" else "(none)"
+	scheme_btn.text = color_scheme_path.get_file() if color_scheme_path != "" else "(none)"
+	scheme_btn.set_meta("path", color_scheme_path)
 	scheme_btn.clip_text = true
 	scheme_btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	scheme_btn.pressed.connect(func():
 		var dlg = FileDialog.new()
 		dlg.access = FileDialog.ACCESS_FILESYSTEM
 		dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-		dlg.current_path = scheme_path_cur
+		dlg.current_path = scheme_btn.get_meta("path", "")
 		dlg.add_filter("*.txt; *.json; *.csv", "Scheme files")
 		dlg.file_selected.connect(func(path: String):
-			scheme_path_cur = path
+			scheme_btn.set_meta("path", path)
 			scheme_btn.text = path.get_file()
 			panel._debounce_timer.start()
 			dlg.queue_free())
@@ -753,8 +752,8 @@ func _build_pane_settings_ui(panel: Control) -> Control:
 			"scroll_lines": int(scroll_spin.value),
 			"default_fg": fg_btn.color,
 			"default_bg": bg_btn.color,
-			"font_path": font_path_cur,
-			"color_scheme_path": scheme_path_cur,
+			"font_path": font_btn.get_meta("path", ""),
+			"color_scheme_path": scheme_btn.get_meta("path", ""),
 		}
 
 	return v
