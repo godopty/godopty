@@ -11,7 +11,7 @@ env:
 jobs:
   # ── Build GDExtension per platform ───────────────────────────────────
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,27 +86,57 @@ jobs:
           name: godopty-windows-x86_64
           path: release/
 
-  # ── Create GitHub Release with all artifacts ─────────────────────────
-  release:
+  # ── Export standalone app + create GitHub Release ─────────────────────
+  export-release:
     needs: [build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
+    container: barichello/godot-ci:4.3
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download GDExtension artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: gdext-artifacts
 
-      - name: Flatten artifact tree
+      - name: Stage GDExtension binaries into godot/bin/
         run: |
-          mkdir release-assets
-          find artifacts -type f -name '*.so' -o -name '*.dylib' -o -name '*.dll' | while read f; do
-            cp "$f" release-assets/
+          mkdir -p godot/bin
+          find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) | while read f; do
+            cp "$f" godot/bin/
           done
+          ls -la godot/bin/
+
+      - name: Import project
+        run: godot --headless --path godot --import
+
+      - name: Export Linux
+        run: |
+          mkdir -p dist
+          godot --headless --path godot --export-release "Linux/X11" dist/godopty-linux-x86_64
+
+      - name: Export Windows
+        run: |
+          godot --headless --path godot --export-release "Windows Desktop" dist/godopty-windows-x86_64.exe
+
+      - name: Export macOS
+        run: |
+          godot --headless --path godot --export-release "macOS" dist/godopty-macos-arm64.zip
+
+      - name: Copy GDExtension artifacts for release
+        run: |
+          mkdir -p dist/gdextension
+          find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) -exec cp {} dist/gdextension/ \;
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/*
+          files: |
+            dist/godopty-linux-x86_64
+            dist/godopty-windows-x86_64.exe
+            dist/godopty-macos-arm64.zip
+            dist/gdextension/*
           generate_release_notes: true
