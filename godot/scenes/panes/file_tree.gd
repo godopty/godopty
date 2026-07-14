@@ -5,7 +5,6 @@ class_name FileTreePane
 @export var root_path := "/"
 
 var _tree: Tree
-var _dir: DirAccess
 
 func _ready():
 	super._ready()

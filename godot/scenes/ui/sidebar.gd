@@ -3,7 +3,6 @@ class_name Sidebar
 
 signal request_new_pane(type_name: String)
 signal request_bulk_spawn(count: int)
-signal request_close_last
 signal request_close(body: Control)
 signal request_settings
 signal request_reset
@@ -186,11 +185,11 @@ func update_profile_list(profiles: Array[Dictionary]):
 	for c in _profile_list.get_children(): c.queue_free()
 	for i in profiles.size():
 		var p = profiles[i]
-		var name = p.get("name", "Unnamed")
+		var p_name = p.get("name", "Unnamed")
 		var row = HBoxContainer.new()
-		var btn = Button.new(); btn.text = name
+		var btn = Button.new(); btn.text = p_name
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.pressed.connect(func(): request_profile.emit(name))
+		btn.pressed.connect(func(): request_profile.emit(p_name))
 		row.add_child(btn)
 		var x = Button.new(); x.text = Icons.DELETE; x.flat = true
 		x.custom_minimum_size = Vector2(22, 0)

@@ -55,8 +55,8 @@ func _build_ui():
 	var dims = _add_dims_control(t_term)
 	var scroll_spin = _add_scroll_control(t_term)
 	t_term.add_child(HSeparator.new())
-	var shell_le = _add_shell_control(t_term)
-	var env_te = _add_env_control(t_term)
+	_add_shell_control(t_term)
+	_add_env_control(t_term)
 
 	# Tab 2: Appearance
 	var t_app = _create_tab(tabs, "Appearance")
@@ -451,10 +451,10 @@ func _show_concept_dialog(idx: int):
 	add_child(dlg)
 	dlg.popup_centered()
 
-func _save_concept(idx: int, name: String, regex_pat: String, cmd: String, target: String):
+func _save_concept(idx: int, p_name: String, regex_pat: String, cmd: String, target: String):
 	if not _concept_terminal: return
 	var concepts = _concept_terminal.get_global_concepts()
-	var entry = {"name": name, "trigger": regex_pat, "actions": [{"cmd": cmd, "target": target}]}
+	var entry = {"name": p_name, "trigger": regex_pat, "actions": [{"cmd": cmd, "target": target}]}
 	if idx >= 0 and idx < concepts.size():
 		concepts[idx] = entry
 	else:

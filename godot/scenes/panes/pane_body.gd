@@ -41,5 +41,5 @@ func _pane_type() -> String:
 
 # Override to add type-specific settings controls.
 # `panel` provides `_debounce_timer` and `_gather_func` (set by each type).
-func _build_pane_settings_ui(panel: Control) -> Control:
+func _build_pane_settings_ui(_panel: Control) -> Control:
 	return VBoxContainer.new()

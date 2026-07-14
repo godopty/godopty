@@ -55,7 +55,7 @@ var color_scheme_path: String = "":
 @export var max_fps: int = 0:
 	set(value):
 		max_fps = value
-		var target = max_fps if max_fps > 0 else (DisplayServer.screen_get_refresh_rate() if DisplayServer.screen_get_refresh_rate() > 0 else 60.0)
+		var target = float(max_fps) if max_fps > 0 else (DisplayServer.screen_get_refresh_rate() if DisplayServer.screen_get_refresh_rate() > 0 else 60.0)
 		_sync_interval = 1.0 / target
 
 var _terminal: GodoptyTerminal
@@ -228,15 +228,15 @@ func _process(delta):
 				var fg: PackedColorArray = updates["fg"]
 				var bg: PackedColorArray = updates["bg"]
 				var attrs: PackedInt32Array = updates["attrs"]
-				var cols: int = _cell_cache["cols"]
+				var grid_cols: int = _cell_cache["cols"]
 				var cc_chars: Array = _cell_cache["chars"]
 				var cc_fg: PackedColorArray = _cell_cache["fg"]
 				var cc_bg: PackedColorArray = _cell_cache["bg"]
 				var cc_attrs: PackedInt32Array = _cell_cache["attrs"]
 				for i in indices.size():
 					var idx: int = indices[i]
-					var r: int = idx / cols
-					var c: int = idx % cols
+					var r: int = int(idx / float(grid_cols))
+					var c: int = idx % grid_cols
 					var old_str: String = cc_chars[r]
 					# Update the packed strings natively (bypasses full array recreation)
 					cc_chars[r] = old_str.substr(0, c) + chars[i] + old_str.substr(c + 1)
@@ -333,7 +333,7 @@ func _draw_cells(off: Vector2, baseline: float):
 			var fg: Color = fg_arr[idx] as Color
 			var a: int = attrs[idx]
 			if a & 16 != 0: skip_next = true
-			if a & 8 != 0: var tmp = fg; fg = bg_arr[idx] as Color
+			if a & 8 != 0: var _tmp = fg; fg = bg_arr[idx] as Color
 
 			if ch != " " and ch != "":
 				var uf = _font
@@ -495,7 +495,7 @@ func _close_search():
 func _on_search_text_changed(new_text: String):
 	_do_search(new_text)
 
-func _on_search_submitted(new_text: String):
+func _on_search_submitted(_new_text: String):
 	if _search_results.get("count", 0) > 0:
 		_jump_to_match(1)  # next match
 
@@ -527,7 +527,7 @@ func _jump_to_match(direction: int):
 	# Scroll to center the matched line in the viewport
 	var match_row: int = rows_arr[current]
 	var history: int = _terminal.get_history_size()
-	var target_offset: int = clampi(history - match_row + rows / 2, 0, history)
+	var target_offset: int = clampi(history - match_row + int(rows / 2.0), 0, history)
 	var cur_offset: int = _terminal.get_scroll_offset()
 	var delta: int = target_offset - cur_offset
 	if delta > 0:

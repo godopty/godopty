@@ -83,7 +83,7 @@ func _notification(what):
 
 func _apply_layout():
 	if _grid == null: return
-	var m = _sidebar_bg.size.x if (_sidebar_bg and _sidebar_bg.visible) else 0
+	var m = _sidebar_bg.size.x if (_sidebar_bg and _sidebar_bg.visible) else 0.0
 	_grid.offset_left = m; _grid.offset_right = 0
 	_grid.offset_top = 0; _grid.offset_bottom = 0
 	_grid.anchor_left = 0.0; _grid.anchor_right = 1.0
@@ -301,9 +301,9 @@ func _build_palette() -> Control:
 
 func _execute_command(cmd: String):
 	if cmd.begins_with("new "):
-		var name = cmd.substr(4).strip_edges()
+		var type_label = cmd.substr(4).strip_edges()
 		for key in PaneTypes.ALL:
-			if PaneTypes.ALL[key]["name"].to_lower() == name:
+			if PaneTypes.ALL[key]["name"].to_lower() == type_label:
 				var body = _spawn_pane(key)
 				if body: body.grab_focus()
 				return
@@ -325,7 +325,6 @@ func _execute_command(cmd: String):
 func _wire_sidebar_signals():
 	_sidebar.request_new_pane.connect(_spawn_pane)
 	_sidebar.request_bulk_spawn.connect(func(count: int): _spawn_bulk(count))
-	_sidebar.request_close_last.connect(func(): _kill_last())
 	_sidebar.request_close.connect(func(body: Control): _kill(body))
 	_sidebar.request_settings.connect(_toggle_settings)
 	_sidebar.request_reset.connect(func(): _reset(); _apply_layout(); _list())
@@ -351,7 +350,7 @@ func _toggle_sidebar():
 	_sidebar_bg.offset_right = _sidebar.offset_right
 	_apply_layout()
 
-func _process(delta: float):
+func _process(_delta: float):
 	if _sidebar == null: return
 	# FPS counter update (throttled to ~4 Hz)
 	if Engine.get_process_frames() % 15 == 0:
@@ -446,14 +445,14 @@ func _save_current_as_profile():
 		dialog.get_ok_button().disabled = (t.strip_edges() == "")
 	)
 	dialog.confirmed.connect(func():
-		var name = name_inp.text.strip_edges()
-		if name == "": return
+		var profile_name = name_inp.text.strip_edges()
+		if profile_name == "": return
 		for i in ts.size():
 			var s = ts[i].get("settings", {})
 			s["shell"] = shell_editors[i].text
 			if not ts[i].has("settings"): ts[i]["settings"] = s
-		ProfileManager.add_profile(name, ts)
-		ToastManager.info("Profile '%s' saved" % name)
+		ProfileManager.add_profile(profile_name, ts)
+		ToastManager.info("Profile '%s' saved" % profile_name)
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(dialog.queue_free)
@@ -463,11 +462,11 @@ func _save_current_as_profile():
 	# Disable OK initially (empty name)
 	name_inp.text_changed.emit("")
 
-func _activate_profile(name: String):
+func _activate_profile(p_name: String):
 	var idx = -1
 	var profs = ProfileManager.profiles
 	for i in profs.size():
-		if profs[i].get("name", "") == name:
+		if profs[i].get("name", "") == p_name:
 			idx = i
 			break
 	if idx == -1: return

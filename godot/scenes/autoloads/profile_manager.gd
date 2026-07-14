@@ -23,21 +23,22 @@ func save_profiles():
 	_write_file(PROFILES_FILE, d)
 	profiles_changed.emit()
 
-func add_profile(name: String, p_tiles: Array[Dictionary]):
-	if name == "":
+func add_profile(p_name: String, p_tiles: Array[Dictionary]):
+	if p_name == "":
 		return
-	var base = name
+	var result_name = p_name
+	var base = p_name
 	var n = 1
-	while _find_by_name(name) != -1:
+	while _find_by_name(result_name) != -1:
 		n += 1
-		name = "%s (%d)" % [base, n]
-	profiles.append({"name": name, "tiles": p_tiles})
+		result_name = "%s (%d)" % [base, n]
+	profiles.append({"name": result_name, "tiles": p_tiles})
 	save_profiles()
 
-func update_profile(index: int, name: String, p_tiles: Array[Dictionary]):
+func update_profile(index: int, p_name: String, p_tiles: Array[Dictionary]):
 	if index < 0 or index >= profiles.size():
 		return
-	profiles[index] = {"name": name, "tiles": p_tiles}
+	profiles[index] = {"name": p_name, "tiles": p_tiles}
 	save_profiles()
 
 func delete_profile(index: int):
@@ -49,8 +50,8 @@ func delete_profile(index: int):
 func get_profiles() -> Array[Dictionary]:
 	return profiles
 
-func _find_by_name(name: String) -> int:
+func _find_by_name(p_name: String) -> int:
 	for i in profiles.size():
-		if profiles[i].get("name", "") == name:
+		if profiles[i].get("name", "") == p_name:
 			return i
 	return -1
