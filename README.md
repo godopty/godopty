@@ -370,6 +370,35 @@ Features planned for future phases, roughly prioritized:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and the pull request process.
 
+## Distribution
+
+Standalone binaries (no Godot install required) are published on [GitHub Releases](https://github.com/you/godopty/releases) for Linux, macOS, and Windows.
+
+| Platform | Package |
+|---|---|
+| **Arch Linux / CachyOS / Manjaro** | `yay -S godopty-bin` ([AUR](https://aur.archlinux.org/packages/godopty-bin)) |
+| **Any Linux** | Download `godopty-linux-x86_64` from the [latest release](https://github.com/you/godopty/releases/latest) |
+| **macOS** | Download `godopty-macos-arm64.zip`, unzip, right-click → Open (unsigned) |
+| **Windows** | Download `godopty-windows-x86_64.exe` |
+
+The in-app update checker notifies direct-download users when a new release is available. Package-managed installs (AUR, apt, dnf) skip the check —
+updates arrive through the package manager.
+
+## Roadmap
+
+| Item | Status |
+|---|---|
+| AUR package (`godopty-bin`) | Done |
+| Standalone export (Linux/macOS/Windows) | Done |
+| In-app update checker | Done |
+| Flatpak (Flathub) | Planned |
+| `.deb` package (PPA) | Planned |
+| `.rpm` package (COPR) | Planned |
+| macOS code signing + notarization | Planned |
+| Windows code signing | Planned |
+| Auto-update (download + replace binary) | Planned |
+
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE) for details.

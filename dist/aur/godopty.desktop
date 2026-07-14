@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=godopty
+Comment=Multi-PTY terminal emulator with tiling grid
+Exec=godopty
+Type=Application
+Categories=System;TerminalEmulator;
+Terminal=false
+StartupNotify=true

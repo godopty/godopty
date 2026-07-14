@@ -1,0 +1,19 @@
+# Maintainer: godopty contributors
+# GitHub: https://github.com/you/godopty
+pkgname=godopty-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Multi-PTY terminal emulator with tiling grid GUI"
+arch=('x86_64')
+url="https://github.com/you/godopty"
+license=('Apache-2.0')
+depends=()
+source=("$pkgname-$pkgver::$url/releases/download/v$pkgver/godopty-linux-x86_64"
+        "godopty.desktop")
+sha256sums=('SKIP'
+            'SKIP')
+
+package() {
+    install -Dm755 "$srcdir/$pkgname-$pkgver" "$pkgdir/usr/bin/godopty"
+    install -Dm644 "$srcdir/godopty.desktop" "$pkgdir/usr/share/applications/godopty.desktop"
+}
