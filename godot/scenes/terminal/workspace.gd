@@ -393,6 +393,8 @@ func _toggle_sidebar():
 	_apply_layout()
 
 func _process(_delta: float):
+	# Concept event polling — must run even before sidebar is ready
+	_poll_concept_events()
 	if _sidebar == null: return
 	# FPS counter update (throttled to ~4 Hz)
 	if Engine.get_process_frames() % 15 == 0:
@@ -403,8 +405,6 @@ func _process(_delta: float):
 			fetch_ms = body.get("_fetch_ms") if "_fetch_ms" in body else -1
 			draw_ms = body.get("_draw_ms") if "_draw_ms" in body else -1
 		_sidebar.update_fps(fps, fetch_ms, draw_ms)
-	# Concept event polling
-	_poll_concept_events()
 
 # ═══════════════════════════════════════════════════════════════════════
 # Concept event routing

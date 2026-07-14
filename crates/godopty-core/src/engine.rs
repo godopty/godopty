@@ -354,9 +354,10 @@ async fn run_terminal_task(
 ) {
     let mut line_parser = crate::parser::LineParser::new();
 
-    // A sleep that we reset depending on capture state.
-    // Duration::MAX effectively disables it when no capture is active.
-    let timeout_sleep = tokio::time::sleep(Duration::MAX);
+    // A safe "inactive" deadline (1 year from now) that won't overflow.
+    const INACTIVE_DURATION: Duration = Duration::from_secs(86400 * 365);
+
+    let timeout_sleep = tokio::time::sleep(INACTIVE_DURATION);
     tokio::pin!(timeout_sleep);
 
     loop {
@@ -366,7 +367,7 @@ async fn run_terminal_task(
                 if ctx.active_capture_name.is_some() {
                     finalize_capture(&mut ctx);
                 }
-                timeout_sleep.as_mut().reset(tokio::time::Instant::now() + Duration::MAX);
+                timeout_sleep.as_mut().reset(tokio::time::Instant::now() + INACTIVE_DURATION);
             }
             msg = ctx.rx.recv() => {
                 match msg {
@@ -401,11 +402,12 @@ async fn run_terminal_task(
                         } else {
                             // Deadline passed — finalize now
                             finalize_capture(&mut ctx);
-                            timeout_sleep.as_mut().reset(tokio::time::Instant::now() + Duration::MAX);
+                            timeout_sleep.as_mut().reset(tokio::time::Instant::now() + INACTIVE_DURATION);
                         }
                     }
                 } else {
                     // Normal mode: check for concept matches
+                    let mut entered_capture = false;
                     for line in &lines {
                         let concepts_guard = ctx.concepts.read().unwrap();
                         let maybe_capture = concept::match_and_broadcast(
@@ -433,16 +435,18 @@ async fn run_terminal_task(
                                 // as the user typed. This chunk may contain cat output
                                 // that should be captured, not displayed.
                                 ctx.capture_buffer.push(bytes.clone());
-                                // Skip the rest — we're in capture mode now
-                                continue;
+                                entered_capture = true;
+                                break;
                             }
                         }
                         drop(concepts_guard);
                     }
-                    // Not entering capture — normal grid feed
-                    feed_grid(&grid, &bytes);
-                    for line in &lines {
-                        store_line(&grid, line);
+                    if !entered_capture {
+                        // No capture triggered — normal grid feed
+                        feed_grid(&grid, &bytes);
+                        for line in &lines {
+                            store_line(&grid, line);
+                        }
                     }
                 }
             }
@@ -451,7 +455,7 @@ async fn run_terminal_task(
                 // Check if user input should stop capture
                 if ctx.active_capture_name.is_some() && capture_stops_on_input(&ctx) {
                     finalize_capture(&mut ctx);
-                    timeout_sleep.as_mut().reset(tokio::time::Instant::now() + Duration::MAX);
+                    timeout_sleep.as_mut().reset(tokio::time::Instant::now() + INACTIVE_DURATION);
                 }
                 match &input {
                     StdinInput::Line(line) => {
