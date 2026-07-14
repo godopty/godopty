@@ -144,11 +144,26 @@ func _get_layout_state() -> Dictionary:
 	return state
 
 func apply_settings(settings: Dictionary):
+	# Restore serialized Color values from JSON round-trips.
+	# Layout JSON stores Colors as "(r, g, b, a)" strings; Godot's
+	# Color(string) constructor doesn't handle the surrounding parens.
+	_restore_color_strings(settings)
 	super.apply_settings(settings)
 	if settings.has("rows") or settings.has("cols"):
 		if _terminal != null:
 			_terminal.resize_grid(rows, cols)
 
+func _restore_color_strings(dict: Dictionary):
+	for key in ["default_fg", "default_bg", "cursor_color", "focus_border_color", "selection_color", "scrollback_indicator_color"]:
+		var v = dict.get(key)
+		if not (v is String): continue
+		var s: String = v.strip_edges()
+		# Format from JSON: "(r, g, b, a)" — strip parens, parse floats
+		if s.begins_with("(") and s.ends_with(")"):
+			s = s.substr(1, s.length() - 2)
+		var parts = s.split(",", false)
+		if parts.size() >= 3:
+			dict[key] = Color(float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]) if parts.size() > 3 else 1.0)
 func _reload_fonts():
 	_font = _load_font(font_path, "res://fonts/DejaVuSansMono.ttf")
 	_font_bold = _load_font(font_bold_path, "res://fonts/DejaVuSansMono-Bold.ttf")
