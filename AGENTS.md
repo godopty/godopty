@@ -143,6 +143,14 @@ Production renderer handles these correctly.
 - **Layout Constraints**: The tiling grid relies on Godot `Control` nodes. Prefer using Godot's built-in Size Flags (Expand/Fill) inside containers (`HBoxContainer`/`VBoxContainer`) over manual pixel math. When manual math is absolutely required (like terminal cell reflows), hook into `_notification(NOTIFICATION_RESIZED)`.
 - **Pub-Sub Bridge**: To handle `WorkspaceEngine` events (like regex concept triggers) in Godot, GDScript must poll the Rust backend in `_process()` or rely on Rust calling `call_deferred("emit_signal", ...)`.
 
+### Concept Capture System
+- **Two capture modes**: `SingleLine` (broadcast Event for command injection) and `UntilStop { stop_timeout_ms, stop_on_input }` (buffer output until timeout or user input).
+- **Capture lifecycle**: On concept match → pending capture (deferred one chunk to avoid Tab completion noise) → confirmed on next non-prompt chunk → buffer raw bytes (NOT fed to grid) → timeout fires or user types → `finalize_capture()` → `CapturedOutput` pushed to per-terminal queue → GDScript drains via `drain_concept_events()`.
+- **Grid suppression via buffering**: During capture, raw `Vec<u8>` chunks are held in `capture_buffer`. Grid is never fed. On `acknowledge_capture` (receiver found), bytes discarded except trailing prompt (after last `\n`). On `flush_capture` (no receiver), all bytes replayed to grid.
+- **Prompt restoration**: Shell prompts lack trailing `\n` so `LineParser` never emits them. On acknowledge, raw bytes after last `\n` are extracted and fed to grid with `\r\n` prefix for correct cursor positioning.
+- **Default concepts**: Shipped in `godot/concepts.default.json`. `ConceptManager._merge_concepts()` deep-merges defaults + user concepts (user keys overlay default keys). Trigger migration updates old regex patterns to new ones.
+- **Concept event routing**: `workspace.gd._process()` polls all terminal panes, drains events, routes to receiver pane by `_pane_type()`. No receiver → toast + flush.
+
 ### Rust
 - **Edition**: 2024 (requires Rust ≥ 1.85)
 - **Format**: standard `rustfmt`
@@ -171,6 +179,12 @@ Production renderer handles these correctly.
 - **GDExtension rebuilds**: After changing `#[func]` signatures or adding methods, rebuild with `cargo build -p godopty-gdext` and restart Godot.
 - **GDScript default params**: Evaluated at definition time, not call time. `func f(x := some_var)` captures the value of `some_var` when the script loads. Use `func f(x := -1)` and check `if x < 0: x = some_var` inside the body for runtime-evaluated defaults.
 - **`extends Node` won't render `Control` children**: Only `Control` nodes can render child `Control`s (Labels, Buttons, etc.). If you add a Label to a plain `Node`, it's invisible. Use `extends Control` for UI containers and set `z_index` for layering.
+- **`tokio::time::Instant::now() + Duration::MAX` panics**: The addition overflows. Use a safe large constant like `Duration::from_secs(86400 * 365)` (1 year) for inactive timeout sleeps.
+- **`tokio::pin!` + `reset()` for capture timeouts**: Use `tokio::pin!(sleep)` and `sleep.as_mut().reset(deadline)` to re-arm a timeout without recreating it each iteration. One `select!` branch, no code duplication.
+- **`continue` in `for` does not skip trailing code**: A `continue` inside a `for` loop only skips the current iteration — code BELOW the loop still executes. Use `break` + a boolean flag to conditionally skip post-loop grid feeding.
+- **Concept regex on PTY output vs. stdin**: Command-detection concepts (like `cat`) must match on user input (Enter produces `StdinInput::Line`), not terminal output (which includes echoed characters, prompts, and shell noise). Tab completion never produces `StdinInput::Line`. Not yet implemented — current approach uses pending capture with `chunk_ends_with_prompt` detection.
+- **Shell prompt has no trailing `\n`**: `LineParser::feed()` only returns completed lines. Prompts like `$ ` remain buffered internally. To extract the prompt from raw bytes, scan for the last `\n` and take everything after it.
+- **Raw-byte buffering for grid replay**: Never buffer parsed lines for later grid replay — the alacritty_terminal ANSI state machine needs raw bytes with escape sequences intact. Buffer `Vec<Vec<u8>>` (chunks), replay with `feed_grid(board, chunk)`.
 - **Rendering Performance**: GDScript `_draw` is slow when calling `draw_rect`/`draw_string` character-by-character. Avoid generating heavy data structures (like `Dictionary`) per-cell across the FFI boundary. Prefer packing data into flat arrays (`PackedByteArray`, `PackedInt32Array`) in Rust, and batch rendering operations line-by-line in Godot.
 - **Resize Rate Limiting**: Firing SIGWINCH heavily on every frame during window drag will overwhelm the child PTY process. Always debounce or rate-limit terminal `_on_resize` events before passing them to the backend.
 
