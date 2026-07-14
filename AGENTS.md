@@ -126,7 +126,6 @@ discrimination, use `body._pane_type()` string discriminators.
 **Headless resource leaks**: GUT warnings about unfreed children and GDExtension `RID`/`ObjectDB`
 leaks are benign in headless mode — the dummy render server doesn't track GDExtension resources.
 Production renderer handles these correctly.
-```
 
 ## Conventions
 
