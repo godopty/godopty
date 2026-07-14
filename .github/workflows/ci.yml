@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── Rust tests (core + gdext + cli) ──────────────────────────────────
+  rust-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Rust tests
+        run: cargo test --workspace
+
+  # ── GDScript tests (GUT headless) ────────────────────────────────────
+  gut-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot headless
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y wget unzip
+          wget -q https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip Godot_v4.7-stable_linux.x86_64.zip
+          chmod +x Godot_v4.7-stable_linux.x86_64
+          sudo mv Godot_v4.7-stable_linux.x86_64 /usr/local/bin/godot
+
+      - name: Import project
+        run: godot --headless --path godot --import
+
+      - name: Run GUT tests
+        run: godot --headless --path godot -s addons/gut/gut_cmdln.gd -d -gdir=res://tests/unit -gdir=res://tests/integration

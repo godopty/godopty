@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+  GDE_BIN: godot/bin
+
+jobs:
+  # ── Build GDExtension per platform ───────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build GDExtension (release)
+        run: cargo build -p godopty-gdext --release
+
+      - name: Package
+        run: |
+          mkdir -p release
+          cp target/release/libgodopty_gdext.so release/libgodopty_gdext.linux.x86_64.so
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godopty-linux-x86_64
+          path: release/
+
+  build-macos:
+    strategy:
+      matrix:
+        target:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-13
+            arch: x86_64
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build GDExtension (release)
+        run: cargo build -p godopty-gdext --release
+
+      - name: Package
+        run: |
+          mkdir -p release
+          cp target/release/libgodopty_gdext.dylib release/libgodopty_gdext.macos.${{ matrix.target.arch }}.dylib
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godopty-macos-${{ matrix.target.arch }}
+          path: release/
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build GDExtension (release)
+        run: cargo build -p godopty-gdext --release
+
+      - name: Package
+        run: |
+          mkdir release
+          copy target\release\godopty_gdext.dll release\godopty_gdext.windows.x86_64.dll
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godopty-windows-x86_64
+          path: release/
+
+  # ── Create GitHub Release with all artifacts ─────────────────────────
+  release:
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifact tree
+        run: |
+          mkdir release-assets
+          find artifacts -type f -name '*.so' -o -name '*.dylib' -o -name '*.dll' | while read f; do
+            cp "$f" release-assets/
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
