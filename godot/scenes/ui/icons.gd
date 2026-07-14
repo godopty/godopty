@@ -12,3 +12,4 @@ const EXPAND   = "\u25B6"            # U+25B6  BLACK RIGHT-POINTING TRIANGLE
 const ADD      = "+"                 # U+002B  PLUS SIGN
 const SETTINGS = "\u2699"            # U+2699  GEAR
 const RESET    = "\u21BA"            # U+21BA  ANTICLOCKWISE OPEN CIRCLE ARROW
+const SWAP     = "\u21C4"            # U+21C4  RIGHTWARDS ARROW OVER LEFTWARDS ARROW

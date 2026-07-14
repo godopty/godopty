@@ -17,6 +17,7 @@ const _PaneScripts := {
 }
 
 var on_close: Callable  # set by workspace to refresh layout after kill
+var on_swap: Callable    # set by workspace to handle pane type swap
 
 var tiles: Array[Dictionary] = []
 var last_body: Control
@@ -163,7 +164,7 @@ func _add_title_bar(parent: VBoxContainer, title: String, root: Control) -> Labe
 	btn_hbox.add_theme_constant_override("separation", 2)
 	btn_hbox.anchor_left = 1.0; btn_hbox.anchor_right = 1.0
 	btn_hbox.anchor_top = 0.0; btn_hbox.anchor_bottom = 1.0
-	var btn_total = 3 * BUTTON_MIN_WIDTH + 8
+	var btn_total = 4 * BUTTON_MIN_WIDTH + 10
 	btn_hbox.offset_left = -btn_total
 	btn_hbox.offset_right = -2
 	bar.add_child(btn_hbox)
@@ -173,6 +174,28 @@ func _add_title_bar(parent: VBoxContainer, title: String, root: Control) -> Labe
 	min_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	min_btn.pressed.connect(func(): _toggle_minimize(root, min_btn))
 	btn_hbox.add_child(min_btn)
+
+	var swap_btn = Button.new()
+	swap_btn.text = Icons.SWAP; swap_btn.focus_mode = Control.FOCUS_NONE
+	swap_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
+	# PopupMenu listing all pane types
+	var swap_menu = PopupMenu.new()
+	swap_menu.name = "SwapMenu"
+	for key in PaneTypes.ALL:
+		swap_menu.add_item(PaneTypes.ALL[key]["name"])
+		swap_menu.set_item_metadata(swap_menu.item_count - 1, key)
+	swap_menu.index_pressed.connect(func(idx: int):
+		var type_name = swap_menu.get_item_metadata(idx)
+		_handle_swap(_find_body(root), type_name, swap_menu)
+	)
+	swap_btn.pressed.connect(func():
+		swap_menu.position = swap_btn.get_screen_position() + Vector2(0, swap_btn.size.y)
+		swap_menu.reset_size()
+		swap_menu.popup()
+	)
+	btn_hbox.add_child(swap_btn)
+	# PopupMenu must be a child of root to receive input
+	root.add_child(swap_menu)
 
 	var settings_btn = Button.new()
 	settings_btn.text = Icons.SETTINGS; settings_btn.focus_mode = Control.FOCUS_NONE
@@ -205,6 +228,45 @@ func kill(body: Control):
 func kill_last():
 	if last_body: kill(last_body)
 
+
+func swap_pane(body: Control, new_type_name: String) -> Control:
+	# Find the tile owning this body.
+	var ti = -1
+	for i in tiles.size():
+		if _find_body(tiles[i].wrapper) == body: ti = i; break
+	if ti == -1:
+		push_error("swap_pane: body not found in tiles")
+		return null
+
+	var tile = tiles[ti]
+	var old_wrapper = tile.wrapper
+
+	# Create a new body of the swapped-to type.
+	var new_body = create_body(new_type_name)
+	if new_body == null:
+		push_error("swap_pane: unknown type '%s'" % new_type_name)
+		return null
+	new_body.name = "Body"
+
+	# Copy compatible settings from the old body to the new one.
+	if body.has_method("_get_layout_state"):
+		var state = body._get_layout_state()
+		new_body.apply_settings(state)
+
+	# Build a new wrapper with the new type's display title.
+	var title = PaneTypes.ALL.get(new_type_name, {}).get("name", new_type_name)
+	var new_wrapper = _build_wrapper_body(new_body, title)
+
+	# Replace the wrapper in the tile — grid position (col/row/cspan/rspan) is unchanged.
+	tile.wrapper = new_wrapper
+
+	# Clean up the old wrapper and its body.
+	old_wrapper.queue_free()
+
+	if last_body == body:
+		last_body = new_body
+
+	return new_body
 func reset():
 	for t in tiles: t.wrapper.queue_free()
 	tiles.clear()
@@ -281,3 +343,8 @@ func _open_pane_settings(body: Control):
 	if _pane_settings_panel == null:
 		_pane_settings_panel = load("res://scenes/ui/pane_settings_panel.gd").new()
 	_pane_settings_panel.open_for(body)
+
+
+func _handle_swap(body: Control, new_type_name: String, _menu: PopupMenu):
+	if on_swap.is_valid():
+		on_swap.call(body, new_type_name)

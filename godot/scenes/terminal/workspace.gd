@@ -42,6 +42,7 @@ func _ready():
 	_wire_sidebar_signals()
 	_refresh_profile_buttons()
 	_tm.on_close = func(body: Control): _kill(body)
+	_tm.on_swap = _swap_pane
 	_restore()
 
 	# Per-type keyboard shortcuts
@@ -143,6 +144,47 @@ func _kill(body: Control):
 	_apply_layout()
 	_list()
 	ToastManager.info("Pane closed")
+
+func _swap_pane(body: Control, new_type_name: String):
+	var old_wrapper = null
+	for t in _tm.tiles:
+		if _tm._find_body(t.wrapper) == body:
+			old_wrapper = t.wrapper
+			break
+
+	var new_body = _tm.swap_pane(body, new_type_name)
+	if new_body == null: return
+
+	# Find the new wrapper (tile's wrapper was replaced in-place)
+	var new_wrapper = null
+	for t in _tm.tiles:
+		if _tm._find_body(t.wrapper) == new_body:
+			new_wrapper = t.wrapper
+			break
+
+	# Remove old wrapper from grid, add new one.
+	if old_wrapper:
+		_grid.remove_child(old_wrapper)
+	if new_wrapper:
+		_grid.add_child(new_wrapper)
+
+	# Wire signals (same pattern as _add_body_to_grid).
+	new_body.focus_entered.connect(func(): _tm.last_body = new_body)
+
+	# For terminals: apply global defaults and wire dynamic title.
+	if new_type_name == "terminal":
+		if new_body.has_method("_terminal"):
+			SettingsManager.apply_to_terminal(new_body)
+		new_body.title_changed.connect(func(t: String):
+			var lbl = new_wrapper.get_node_or_null("BodyVBox/TitleBar/TitleLabel")
+			if lbl: lbl.text = " " + t
+		)
+
+	_apply_layout()
+	_list()
+	if new_body.focus_mode != Control.FOCUS_NONE:
+		new_body.grab_focus()
+	ToastManager.info("Swapped to %s" % PaneTypes.ALL[new_type_name]["name"])
 
 func _kill_last():
 	_tm.kill_last()
