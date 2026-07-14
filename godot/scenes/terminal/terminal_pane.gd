@@ -24,7 +24,14 @@ const PRINTABLE_ASCII_MAX = 126
 @export var focus_border_color: Color = FOCUS_BORDER_COLOR
 @export var selection_color: Color = SELECTION_COLOR
 @export var scrollback_indicator_color: Color = SCROLLBACK_INDICATOR_COLOR
-var color_scheme_path: String = ""
+var color_scheme_path: String = "":
+	set(value):
+		color_scheme_path = value
+		if _terminal != null:
+			_apply_stored_scheme()
+
+var pane_name := ""
+
 
 @export var shell_command: String = "/bin/bash"
 @export var shell_env := ""
@@ -131,7 +138,49 @@ func _notification(what):
 	if what == NOTIFICATION_RESIZED: _on_resize()
 
 func _get_layout_state() -> Dictionary:
-	return {"shell": shell_command, "rows": rows, "cols": cols}
+	return {
+		"shell": shell_command, "rows": rows, "cols": cols,
+		"shell_env": shell_env, "font_size": font_size, "font_path": font_path,
+		"color_scheme_path": color_scheme_path,
+		"cursor_shape": cursor_shape, "cursor_blink": cursor_blink,
+		"cursor_blink_speed": cursor_blink_speed, "cursor_color": cursor_color,
+		"scroll_lines": scroll_lines, "max_fps": max_fps,
+		"default_fg": default_fg, "default_bg": default_bg,
+		"beam_cursor_width": beam_cursor_width,
+		"underline_cursor_height": underline_cursor_height,
+		"pane_name": pane_name,
+	}
+
+func apply_settings(settings: Dictionary):
+	for key in settings:
+		var v = settings[key]
+		match key:
+			"shell_command":            shell_command = v
+			"shell_env":                shell_env = v
+			"rows":                     rows = v
+			"cols":                     cols = v
+			"font_size":                font_size = v
+			"font_path":                font_path = v
+			"color_scheme_path":        color_scheme_path = v
+			"cursor_shape":             cursor_shape = v
+			"cursor_blink":             cursor_blink = v
+			"cursor_blink_speed":       cursor_blink_speed = v
+			"cursor_color":             cursor_color = v
+			"scroll_lines":             scroll_lines = v
+			"max_fps":                  max_fps = v
+			"default_fg":               default_fg = v
+			"default_bg":               default_bg = v
+			"beam_cursor_width":        beam_cursor_width = v
+			"underline_cursor_height":  underline_cursor_height = v
+			"pane_name":                pane_name = v
+			"focus_border_color":       focus_border_color = v
+			"selection_color":          selection_color = v
+			"scrollback_indicator_color": scrollback_indicator_color = v
+	if settings.has("rows") or settings.has("cols"):
+		if _terminal != null:
+			_terminal.resize_grid(rows, cols)
+	if settings.has("pane_name"):
+		title_changed.emit(pane_name if pane_name != "" else shell_command)
 
 func _reload_fonts():
 	_font = _load_font(font_path, "res://fonts/DejaVuSansMono.ttf")
@@ -220,7 +269,9 @@ func _process(delta):
 	_draw_ms = 0  # will be set on next _draw() call
 	var t = _terminal.get_title()
 	if t != _last_title and t != "":
-		_last_title = t; title_changed.emit(t)
+		_last_title = t
+		var display_title = pane_name if pane_name != "" else t
+		title_changed.emit(display_title)
 
 func _grid_offset() -> Vector2:
 	var gc: int = _cell_cache["cols"]

@@ -15,6 +15,8 @@ var on_close: Callable  # set by workspace to refresh layout after kill
 var tiles: Array[Dictionary] = []
 var last_body: Control
 
+var _pane_settings_panel  # set by workspace
+
 func spawn(shell := "") -> Control:
 	var s = shell if shell != "" else SettingsManager.cfg_shell_command
 	var w = _build_wrapper(s, SettingsManager.cfg_default_rows, SettingsManager.cfg_default_cols)
@@ -176,7 +178,7 @@ func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Labe
 	btn_hbox.add_theme_constant_override("separation", 2)
 	btn_hbox.anchor_left = 1.0; btn_hbox.anchor_right = 1.0
 	btn_hbox.anchor_top = 0.0; btn_hbox.anchor_bottom = 1.0
-	var btn_total = 2 * BUTTON_MIN_WIDTH + 6
+	var btn_total = 3 * BUTTON_MIN_WIDTH + 8
 	btn_hbox.offset_left = -btn_total
 	btn_hbox.offset_right = -2
 	bar.add_child(btn_hbox)
@@ -186,6 +188,12 @@ func _add_title_bar(parent: VBoxContainer, shell: String, root: Control) -> Labe
 	min_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
 	min_btn.pressed.connect(func(): _toggle_minimize(root, min_btn))
 	btn_hbox.add_child(min_btn)
+
+	var settings_btn = Button.new()
+	settings_btn.text = Icons.SETTINGS; settings_btn.focus_mode = Control.FOCUS_NONE
+	settings_btn.custom_minimum_size = Vector2(BUTTON_MIN_WIDTH, BUTTON_MIN_HEIGHT)
+	settings_btn.pressed.connect(func(): _open_pane_settings(_find_body(root)))
+	btn_hbox.add_child(settings_btn)
 
 	var close_btn = Button.new()
 	close_btn.text = Icons.CLOSE; close_btn.focus_mode = Control.FOCUS_NONE
@@ -207,3 +215,8 @@ func _toggle_minimize(w: Control, btn: Button):
 func _handle_close(body: Control):
 	if on_close.is_valid():
 		on_close.call(body)
+
+func _open_pane_settings(body: Control):
+	if _pane_settings_panel == null:
+		_pane_settings_panel = load("res://scenes/ui/pane_settings_panel.gd").new()
+	_pane_settings_panel.open_for(body)

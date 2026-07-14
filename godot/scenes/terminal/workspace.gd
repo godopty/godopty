@@ -26,6 +26,10 @@ func _ready():
 	var overlay = load("res://scenes/ui/toast_overlay.gd").new()
 	add_child(overlay)
 
+	var pane_settings = load("res://scenes/ui/pane_settings_panel.gd").new()
+	add_child(pane_settings)
+	_tm._pane_settings_panel = pane_settings
+
 	_build_sidebar()
 	ProfileManager.load_profiles()
 	_apply_layout()
@@ -141,10 +145,12 @@ func _gather_tiles() -> Array[Dictionary]:
 	var ts: Array[Dictionary] = []
 	for t in _tm.tiles:
 		var body = _tm._find_body(t.wrapper)
-		var state = body._get_layout_state() if body and body.has_method("_get_layout_state") else {}
-		state["col"] = t.col; state["row"] = t.row
-		state["cspan"] = t.cspan; state["rspan"] = t.rspan
-		ts.append(state)
+		var settings = body._get_layout_state() if body and body.has_method("_get_layout_state") else {}
+		ts.append({
+			"col": t.col, "row": t.row,
+			"cspan": t.cspan, "rspan": t.rspan,
+			"settings": settings,
+		})
 	return ts
 
 func _save():
@@ -157,7 +163,8 @@ func _restore():
 	var untrusted := false
 	for td in tiles:
 		if not (td is Dictionary): continue
-		var sh = td.get("shell", "")
+		var settings = td.get("settings", {})
+		var sh = settings.get("shell", td.get("shell", ""))
 		if sh != "" and sh != SettingsManager.cfg_shell_command:
 			untrusted = true
 			break
@@ -181,11 +188,17 @@ func _do_restore(tiles: Array[Dictionary]):
 	_tm.reset()
 	for td in tiles:
 		if not (td is Dictionary): continue
-		var sh = td.get("shell", SettingsManager.cfg_shell_command)
+		var settings = td.get("settings", {})
+		# Prefer shell/rows/cols from settings dict (new format), fall back to top-level (old format)
+		var sh = settings.get("shell", td.get("shell", SettingsManager.cfg_shell_command))
 		if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
-		var w = _tm.build_wrapper(sh, td.get("rows", SettingsManager.cfg_default_rows), td.get("cols", SettingsManager.cfg_default_cols))
-		_grid.add_child(w)
+		var r = settings.get("rows", td.get("rows", SettingsManager.cfg_default_rows))
+		var c = settings.get("cols", td.get("cols", SettingsManager.cfg_default_cols))
+		var w = _tm.build_wrapper(sh, r, c)
 		var body = _tm._find_body(w)
+		if not settings.is_empty():
+			SettingsManager.apply_pane_settings(body, settings)
+		_grid.add_child(w)
 		body.focus_entered.connect(func(): _tm.last_body = body)
 		_tm.tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),
 			cspan = td.get("cspan", GRID), rspan = td.get("rspan", GRID)})
@@ -383,7 +396,7 @@ func _save_current_as_profile():
 		var lbl = Label.new(); lbl.text = "Pane %d:" % (i + 1)
 		lbl.custom_minimum_size = Vector2(55, 0)
 		row.add_child(lbl)
-		var le = LineEdit.new(); le.text = ts[i].get("shell", SettingsManager.cfg_shell_command)
+		var le = LineEdit.new(); le.text = ts[i].get("settings", {}).get("shell", SettingsManager.cfg_shell_command)
 		le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		shell_editors.append(le)
 		row.add_child(le)
@@ -397,7 +410,9 @@ func _save_current_as_profile():
 		var name = name_inp.text.strip_edges()
 		if name == "": return
 		for i in ts.size():
-			ts[i]["shell"] = shell_editors[i].text
+			var s = ts[i].get("settings", {})
+			s["shell"] = shell_editors[i].text
+			if not ts[i].has("settings"): ts[i]["settings"] = s
 		ProfileManager.add_profile(name, ts)
 		ToastManager.info("Profile '%s' saved" % name)
 		dialog.queue_free()
@@ -441,11 +456,16 @@ func _do_activate(profile: Dictionary):
 	var tiles = profile.get("tiles", [])
 	for td in tiles:
 		if not (td is Dictionary): continue
-		var sh = td.get("shell", SettingsManager.cfg_shell_command)
+		var settings = td.get("settings", {})
+		var sh = settings.get("shell", td.get("shell", SettingsManager.cfg_shell_command))
 		if sh == null or sh == "": sh = SettingsManager.cfg_shell_command
-		var w = _tm.build_wrapper(sh, td.get("rows", SettingsManager.cfg_default_rows), td.get("cols", SettingsManager.cfg_default_cols))
-		_grid.add_child(w)
+		var r = settings.get("rows", td.get("rows", SettingsManager.cfg_default_rows))
+		var c = settings.get("cols", td.get("cols", SettingsManager.cfg_default_cols))
+		var w = _tm.build_wrapper(sh, r, c)
 		var body = _tm._find_body(w)
+		if not settings.is_empty():
+			SettingsManager.apply_pane_settings(body, settings)
+		_grid.add_child(w)
 		body.focus_entered.connect(func(): _tm.last_body = body)
 		_tm.tiles.append({wrapper = w, col = td.get("col", 0), row = td.get("row", 0),
 			cspan = td.get("cspan", GRID), rspan = td.get("rspan", GRID)})

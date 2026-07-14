@@ -65,23 +65,26 @@ func save_settings():
 	settings_changed.emit()
 
 func apply_to_terminal(body: Control):
-	body.cursor_shape = cfg_cursor_shape
-	body.cursor_blink = cfg_cursor_blink
-	body.cursor_blink_speed = cfg_cursor_blink_speed
-	body.scroll_lines = cfg_scroll_lines
-	body.rows = cfg_default_rows
-	body.cols = cfg_default_cols
-	body.beam_cursor_width = cfg_beam_width
-	body.underline_cursor_height = cfg_underline_height
-	body.focus_border_color = cfg_focus_border
-	body.selection_color = cfg_selection
-	body.scrollback_indicator_color = cfg_scrollback_indicator
-	body.color_scheme_path = cfg_color_scheme_path
-	body.font_path = cfg_font_path
-	body.font_size = cfg_font_size
-	body.max_fps = cfg_max_fps
-	body.shell_command = cfg_shell_command
-	body.shell_env = cfg_shell_env
+	body.apply_settings({
+		"cursor_shape": cfg_cursor_shape,
+		"cursor_blink": cfg_cursor_blink,
+		"cursor_blink_speed": cfg_cursor_blink_speed,
+		"scroll_lines": cfg_scroll_lines,
+		"beam_cursor_width": cfg_beam_width,
+		"underline_cursor_height": cfg_underline_height,
+		"focus_border_color": cfg_focus_border,
+		"selection_color": cfg_selection,
+		"scrollback_indicator_color": cfg_scrollback_indicator,
+		"color_scheme_path": cfg_color_scheme_path,
+		"font_path": cfg_font_path,
+		"font_size": cfg_font_size,
+		"max_fps": cfg_max_fps,
+		"shell_command": cfg_shell_command,
+		"shell_env": cfg_shell_env,
+	})
+
+func apply_pane_settings(body: Control, settings: Dictionary):
+	body.apply_settings(settings)
 
 func _color_from_hex(hex: String, fallback: Color) -> Color:
 	if hex == "": return fallback
