@@ -18,15 +18,38 @@ cd godot && godot -e
 godot/
 ├── project.godot            # Godot 4.7 project config
 ├── godopty.gdextension      # GDExtension library config
-├── fonts/                   # Bundled monospace fonts
+├── concepts.default.json    # Shipped default concepts
+├── fonts/                   # Bundled fonts (DejaVu Sans Mono + Phosphor icons)
 │   ├── DejaVuSansMono.ttf
 │   ├── DejaVuSansMono-Bold.ttf
-│   └── DejaVuSansMono-Oblique.ttf
+│   ├── DejaVuSansMono-Oblique.ttf
+│   └── Phosphor-Regular.ttf
 └── scenes/
     ├── main.tscn            # Root scene (Workspace)
-    ├── workspace.gd         # Workspace controller — grid layout, sidebar, palette
-    ├── terminal_pane.gd     # Terminal Control — rendering, keyboard, focus
-    └── focus_manager.gd     # Autoload — Alt+Arrow pane navigation
+    ├── autoloads/           # 9 singleton managers
+    │   ├── base_persistence_manager.gd  # Shared JSON I/O base
+    │   ├── settings_manager.gd
+    │   ├── profile_manager.gd
+    │   ├── concept_manager.gd
+    │   ├── layout_manager.gd
+    │   ├── focus_manager.gd
+    │   ├── toast_manager.gd
+    │   ├── shortcut_manager.gd
+    │   └── update_checker.gd
+    ├── terminal/            # Core terminal logic
+    │   ├── workspace.gd     # Grid layout, sidebar, profiles, concept routing
+    │   ├── terminal_pane.gd # Control-based renderer, keyboard, selection
+    │   └── terminal_manager.gd
+    ├── ui/                  # UI components
+    │   ├── sidebar.gd
+    │   ├── settings_panel.gd
+    │   ├── toast_overlay.gd
+    │   └── icons.gd         # Phosphor icon constants
+    └── panes/               # Specialty pane types
+        ├── pane_body.gd
+        ├── code_viewer.gd
+        ├── file_tree.gd
+        └── observer_pane.gd
 ```
 
 ## Key Bindings
