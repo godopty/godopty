@@ -142,8 +142,8 @@ cd godopty
 # Build everything
 cargo build
 
-# Run tests (23 unit tests)
-cargo test -p godopty-core
+# Run tests (47 Rust unit + 12 integration + 59 GDScript)
+cargo test --workspace
 
 # Run checks
 cargo check
@@ -275,27 +275,43 @@ The Concept Engine allows developers to automate repetitive workflows based on s
 - [x] Settings persistence (auto-save/load to `user://settings.json`)
 - [x] Toast notification system (`ToastManager` autoload, replace-on-new, 3 levels)
 
+### ✅ Phase 2d — Concept Capture & Output Routing (COMPLETE)
+
+- [x] `CaptureMode` enum — `SingleLine` (inject commands) and `UntilStop { stop_timeout_ms, stop_on_input }` (buffer output)
+- [x] Per-terminal capture state machine with timeout + input-stop
+- [x] Raw-byte buffering — preserves ANSI state for correct grid replay on flush
+- [x] `CapturedOutput` queue drained by GDScript via `drain_concept_events()` FFI
+- [x] Bi-directional handshake: `acknowledge_capture()` (receiver consumed) / `flush_capture()` (no receiver)
+- [x] GDScript routing: workspace polls all terminals, routes captured output to pane by `_pane_type()`
+- [x] `CodeViewer.receive_content()` for programmatic content display
+- [x] Default concepts shipped in `concepts.default.json` with enabled/disable toggle
+- [x] `ConceptManager._merge_concepts()` — deep-merges user overrides onto shipped defaults
+- [x] Prompt restoration on acknowledge: raw bytes after last `\n` fed to grid with `\r\n`
+- [x] Pending capture deferral to filter Tab completion reprints
+
+
 ### 🔜 Phase 3 — Spatial Layout & SQLite
 
-- [ ] Nested `SplitContainer` logic
+- [x] Nested `SplitContainer` logic
 - [ ] Drag-and-drop pane swapping
-- [ ] Label/Tag UI for terminals
-- [ ] Code Viewer panes (`CodeEdit` node)
+- [x] Label/Tag UI for terminals
+- [x] Code Viewer panes (`CodeEdit` node)
 - [ ] Task Ledger pane
-- [ ] SQLite + FTS5 async logging backend
-- [ ] Session history persistence between restarts
-- [ ] `SIGWINCH` handling (Godot resize → PTY resize signal)
-- [ ] **Concept Manager UI** — add/edit/remove regex-triggered concepts and action targets through the settings panel
+- [x] SQLite history store for persistent scrollback
+- [x] Session history persistence between restarts
+- [x] `SIGWINCH` handling (Godot resize → PTY resize signal)
+- [x] **Concept Manager UI** — add/edit/remove concepts with enable/disable toggle and capture mode selector
 
-### Phase 4 — Reactive UX & Visual Scripting
 
-- [ ] **Visual Concept Graph** — Allow users to build concept automations visually using Godot's GraphEdit nodes, connecting regex matchers to output filters and action triggers without writing JSON.
-- [ ] **Interactive Output** — Convert specific text patterns (such as file paths and line numbers) into clickable UI elements that open integrated viewers or external editors.
-- [ ] **Dynamic Shaders** — Expose Godot's shading language to the terminal background, enabling CRT effects, glassmorphism, or state-based visual feedback.
-- [ ] **Reactive Environments** — Link terminal events to global UI state, such as shifting the application tint to red upon detecting a panic, or emitting subtle particle effects on successful test suites.
-- [ ] **Variable Substitution (CLI AI)** — Add `{payload}` string interpolation to the Concept Engine's action templates. Allows passing extracted tokens from one pane into another's shell (e.g., injecting an error string into an ephemeral `ollama run` command).
-- [ ] **Persistent REPL Injection** — Support routing event payloads directly into the `stdin` of a running script, enabling persistent context-aware agents in adjacent panes.
-- [ ] **Native AI Observer Pane** — Build a dedicated Godot pane that subscribes directly to the `WorkspaceEngine`. By bypassing shell escaping entirely, it safely catches multi-line tracebacks in-memory, queries an LLM API natively, and renders the explanation via a Markdown `RichTextLabel`.
+### 🔜 Phase 4 — Reactive UX & Visual Scripting
+
+- [ ] **Visual Concept Graph** — Build concept automations visually using Godot's GraphEdit nodes
+- [x] **Interactive Output** — Concept capture routes command output to code viewer or file tree panes
+- [ ] **Dynamic Shaders** — CRT effects, glassmorphism, state-based visual feedback via Godot shaders
+- [ ] **Reactive Environments** — Link terminal events to global UI state (tint on panic, particles on success)
+- [x] **Variable Substitution** — `{payload}`, `{0}`..`{N}` capture-group interpolation in action templates
+- [ ] **Persistent REPL Injection** — Route event payloads directly into stdin of running scripts
+- [ ] **Native AI Observer Pane** — LLM API queries, Markdown rendering, bypass shell escaping
 
 ---
 
