@@ -164,27 +164,6 @@ Security Warning: The Concept Engine is designed to execute commands automatical
 
 ---
 
-## Technical Hurdles & Mitigations
-
-### Cross-Platform PTY
-- `portable-pty` provides a uniform API over POSIX `/dev/ptmx` and Windows ConPTY
-- Process-killing must be abstracted: Unix uses POSIX signals, Windows uses `TerminateProcess`
-- Environment variable setup differs per platform
-
-### SIGWINCH (Window Resize)
-- Godot `SplitContainer` resize -> GDScript signal
-- Pass new `(rows, cols)` through `gdext` to Rust
-- Forward `PtySize` to `portable-pty` master -> OS sends `SIGWINCH` to child process
-- `alacritty_terminal` reflows the grid
-
-### gdext + tokio Bridge
-- Godot runs its own main loop on the main thread
-- A global tokio runtime is started at extension init
-- PTY threads push grid snapshots into a `Mutex<Vec<(TerminalId, GridData)>>`
-- Godot's `_process()` drains the queue and updates `_draw()`
-- This avoids blocking the Godot render thread
-
----
 
 ## Contributing
 
