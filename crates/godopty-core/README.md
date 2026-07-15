@@ -20,8 +20,8 @@ Library crate for the godopty multi-PTY emulator. This is the engine — all ter
 
 The engine supports two capture modes:
 
-- **`SingleLine`**: Per-line regex matching. On match, broadcasts an `Event` on the pub-sub channel. Receiving terminals with matching labels inject the action's command template into their PTY stdin.
-- **`UntilStop { stop_timeout_ms, stop_on_input }`**: Command-output capture. On match, the terminal enters capture mode — all subsequent PTY output is buffered as raw bytes (never fed to the grid). The capture ends on timeout (silence for N ms) or user input. The captured output is routed via GDScript to a receiver pane (e.g., code viewer) or flushed back to the terminal grid.
+- `SingleLine`: Per-line regex matching. On match, broadcasts an `Event` on the pub-sub channel. Receiving terminals with matching labels inject the action's command template into their PTY stdin.
+- `UntilStop { stop_timeout_ms, stop_on_input }`: Command-output capture. On match, the terminal enters capture mode — all subsequent PTY output is buffered as raw bytes (never fed to the grid). The capture ends on timeout (silence for N ms) or user input. The captured output is routed via GDScript to a receiver pane (e.g., code viewer) or flushed back to the terminal grid.
 
 Key functions: `finalize_capture()`, `handle_command()`, `capture_stops_on_input()`, `feed_grid()`, `store_line()`.
 

@@ -68,8 +68,8 @@ godot/
 ## Sidebar
 
 - [+ Terminal] — spawn a new terminal
-- [⚙ Settings] — open global settings panel
-- [↺ Reset] — clear all terminals and layout
+- [Settings] — open global settings panel
+- [Reset] — clear all terminals and layout
 
 Layout is auto-saved on close and auto-restored on startup via `user://layout.json`.
 

@@ -8,6 +8,61 @@ Rust + Godot 4.7 multi-PTY terminal emulator with a tiling grid GUI.
 - **Entry point**: `godot/scenes/main.tscn` → `workspace.gd` (root Control node)
 - **License**: Apache 2.0 (see `LICENSE`)
 
+```
+godopty/
+├── Cargo.toml                  # Workspace root
+├── AGENTS.md
+├── LICENSE
+├── crates/
+│   ├── godopty-core/           # Library: PTY, ANSI, grid, concepts, pub-sub
+│   │   └── src/
+│   │       ├── lib.rs          # Module map + data-flow diagram
+│   │       ├── types.rs        # Concept, Event, Action, CaptureMode, CapturedOutput
+│   │       ├── concept.rs      # Regex matching + label routing (pure fns)
+│   │       ├── engine.rs       # WorkspaceEngine, capture state machine, SpawnedTerminal
+│   │       ├── pty.rs          # portable-pty spawn + dedicated I/O thread
+│   │       ├── parser.rs       # vte → plain-text LineParser
+│   │       ├── term.rs         # alacritty_terminal grid + CellInfo + damage tracking
+│   │       ├── color.rs        # ANSI color → RGB
+│   │       ├── keymap.rs       # Key event → byte sequence
+│   │       └── history.rs      # SQLite scrollback store
+│   ├── godopty-cli/            # CLI demos (mock, --pty, --term)
+│   │   └── src/main.rs
+│   └── godopty-gdext/          # GDExtension cdylib: GodoptyTerminal GodotClass
+│       └── src/lib.rs
+└── godot/                      # Godot 4.7 project
+    ├── project.godot
+    ├── godopty.gdextension
+    ├── concepts.default.json   # Shipped default concepts
+    ├── fonts/                  # DejaVu Sans Mono + Phosphor icons
+    └── scenes/
+        ├── main.tscn
+        ├── autoloads/          # Singleton managers
+        │   ├── base_persistence_manager.gd
+        │   ├── settings_manager.gd
+        │   ├── profile_manager.gd
+        │   ├── concept_manager.gd
+        │   ├── layout_manager.gd
+        │   ├── focus_manager.gd
+        │   ├── toast_manager.gd
+        │   ├── shortcut_manager.gd
+        │   └── update_checker.gd
+        ├── terminal/
+        │   ├── workspace.gd        # Root controller, concept routing, profile restore
+        │   ├── terminal_pane.gd    # Control-based renderer, keyboard, selection
+        │   └── terminal_manager.gd # Tile lifecycle, split/kill/swap/spawn
+        ├── ui/
+        │   ├── sidebar.gd
+        │   ├── settings_panel.gd
+        │   ├── toast_overlay.gd
+        │   └── icons.gd            # Phosphor icon constants
+        └── panes/
+            ├── pane_body.gd        # Base class
+            ├── code_viewer.gd
+            ├── file_tree.gd
+            └── observer_pane.gd
+```
+
 ## Commands
 
 ```bash
@@ -16,13 +71,13 @@ cargo build -p godopty-gdext
 # Copy to the Godot project for local development
 cp target/debug/libgodopty_gdext.so godot/bin/libgodopty_gdext.linux.x86_64.so
 
-# Run all Rust tests (57 across core, gdext, cli)
+# Run all Rust tests (across core, gdext, cli)
 cargo test --workspace
 
 # Type-check Rust only (fast, no codegen)
 cargo check
 
-# Run all GDScript tests (59 unit + integration, headless)
+# Run all GDScript tests (unit + integration, headless)
 godot --headless --path godot --import
 godot --headless --path godot -s addons/gut/gut_cmdln.gd -d -gdir=res://tests/unit -gdir=res://tests/integration
 
@@ -33,55 +88,6 @@ cargo run --bin godopty-cli -- --term    # alacritty_terminal grid
 
 # Open in Godot editor (after building gdext)
 cd godot && godot -e
-```
-
-## Architecture
-
-### Rust crates (`crates/`)
-
-| Crate | Role |
-|---|---|
-| `godopty-core` | Library: PTY spawning, ANSI parsing (vte), alacritty_terminal grid, concept/pub-sub engine |
-| `godopty-cli` | CLI binary: three demo modes (mock, `--pty`, `--term`) |
-| `godopty-gdext` | GDExtension cdylib: `GodoptyTerminal` GodotClass bridging Rust ↔ GDScript |
-
-Key modules in `godopty-core`:
-- `pty.rs` — portable-pty spawn + dedicated I/O thread
-- `parser.rs` — vte ANSI state machine, extracts visible lines
-- `term.rs` — alacritty_terminal grid + CellInfo
-- `engine.rs` — WorkspaceEngine with tokio broadcast pub-sub
-- `concept.rs` — regex-trigger → labelled-action routing
-- `types.rs` — Concept, Event, Action, TerminalConfig structs
-- `color.rs` — ANSI color mapping: named, indexed (256-color), true-color → RGB
-
-### Godot scenes (`godot/scenes/`)
-
-```
-scenes/
-├── autoloads/
-│   ├── base_persistence_manager.gd  # Shared JSON I/O base for persistence managers
-│   ├── settings_manager.gd          # user://settings.json, settings_changed signal
-│   ├── profile_manager.gd           # user://profiles.json, named layout snapshots
-│   ├── concept_manager.gd           # user://concepts.json, pushes to Rust on startup
-│   ├── layout_manager.gd            # user://layout.json, workspace tile persistence
-│   ├── focus_manager.gd             # Alt+Arrow geographic pane navigation
-│   ├── toast_manager.gd             # Transient toast notifications
-│   ├── shortcut_manager.gd          # Keyboard shortcut registry (via InputMap)
-│   └── update_checker.gd            # Polls GitHub Releases for new versions on startup
-├── terminal/
-│   ├── workspace.gd                 # Root controller: tile grid, layout, sidebar, profiles
-│   ├── terminal_pane.gd             # Control-based renderer: _draw(), input, selection
-│   └── terminal_manager.gd          # Tile lifecycle, split/kill/expand, wrapper builder
-├── ui/
-│   ├── sidebar.gd                   # Side panel: buttons, profile section, pane list
-│   ├── settings_panel.gd            # Overlay panel: cursor, colors, concepts, per-tab UI
-│   ├── toast_overlay.gd             # Toast UI renderer
-│   └── icons.gd                     # Icons class with const glyph constants
-├── panes/
-│   ├── code_viewer.gd              # Read-only code viewer pane
-│   ├── file_tree.gd                # Directory listing pane
-│   └── observer_pane.gd            # AI observer output pane
-└── main.tscn                       # Scene entry point
 ```
 
 ### Data flow
@@ -103,8 +109,8 @@ cargo test -p godopty-core      # core library only (44 tests)
 ### GDScript (GUT)
 
 Tests live in `godot/tests/` — `unit/` for pure-logic classes, `integration/` for scene-tree tests.
-
-```bash
+cargo test --workspace          # 60 tests across core, gdext, cli
+cargo test -p godopty-core      # core library only (47 tests)
 godot --headless --path godot --import         # required before first run
 godot --headless --path godot -s addons/gut/gut_cmdln.gd -d \
   -gdir=res://tests/unit -gdir=res://tests/integration
