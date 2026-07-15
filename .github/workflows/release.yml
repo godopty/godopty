@@ -151,7 +151,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/godopty-${VERSION}-linux-x86_64.tar.gz
-            dist/godopty-${VERSION}-windows-x86_64.exe
-            dist/godopty-${VERSION}-macos.zip
+            dist/godopty-${{ github.ref_name }}-linux-x86_64.tar.gz
+            dist/godopty-${{ github.ref_name }}-windows-x86_64.exe
+            dist/godopty-${{ github.ref_name }}-macos.zip
             dist/gdextension/*
+          generate_release_notes: true
