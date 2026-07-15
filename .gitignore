@@ -13,7 +13,6 @@ godot/.import/
 godot/.godot/
 godot/*.import
 godot/export/
-godot/export_presets.cfg
 
 # Godot-specific transient files
 *.translation
