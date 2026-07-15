@@ -4,9 +4,9 @@ godopty (goh-doh-tee), a Godot-based Rust multi-PTY emulator desktop application
 
 ## Overview
 
-- **Reactive Automation**: Rather than acting as a passive text pipe, the terminal reads its own output. The built-in pub-sub engine detects matched patterns and automatically executes actions (fixes, restarts, or notifications) in adjacent panes.
-- **Unrestricted Aesthetics**: Built on Godot to support fluid animations, instant theming, and rich UI overlays without the memory overhead of an embedded browser.
-- **Zero-Friction Tiling**: Managing multiple panes relies on a native graphical grid and drag-and-drop mechanics, bypassing the need to memorize complex keyboard multiplexer bindings.
+- Reactive Automation: Rather than acting as a passive text pipe, the terminal reads its own output. The built-in pub-sub engine detects matched patterns and automatically executes actions (fixes, restarts, or notifications) in adjacent panes.
+- Unrestricted Aesthetics: Built on Godot to support fluid animations, instant theming, and rich UI overlays without the memory overhead of an embedded browser.
+- Zero-Friction Tiling: Managing multiple panes relies on a native graphical grid and drag-and-drop mechanics, bypassing the need to memorize complex keyboard multiplexer bindings.
 - Open source, no telemetry, no logins.
 
 ---
@@ -20,7 +20,7 @@ godopty (goh-doh-tee), a Godot-based Rust multi-PTY emulator desktop application
 | Pub-sub | `tokio::sync::broadcast(1024)` | 1:N fan-out, lagged-receiver protection, self-reaction prevention |
 | Grid rendering | `alacritty_terminal` | Full DEC STD 070 grid state machine; pass arrays to Godot `_draw()` |
 | Godot bridge | `gdext 0.5` | Native GDExtension for Godot 4.7+ |
-| Rust edition | 2024 | Requires Rust ≥ 1.85 |
+| Rust edition | 2024 | Requires Rust >= 1.85 |
 
 ---
 
@@ -30,8 +30,8 @@ Standalone binaries (no Godot install required) are published on [GitHub Release
 
 | Platform | Package |
 |---|---|
-| Linux | Download `godopty-linux-x86_64` from the [latest release](https://github.com/you/godopty/releases/latest) |
-| macOS | Download `godopty-macos-arm64.zip`, unzip, right-click → Open (unsigned) |
+| Linux | Download `godopty-linux-x86_64.tar.gz` from the [latest release](https://github.com/you/godopty/releases/latest) |
+| macOS | Download `godopty-macos.zip`, unzip, right-click -> Open (unsigned) |
 | Windows | Download `godopty-windows-x86_64.exe` |
 
 ---
@@ -67,10 +67,10 @@ Standalone binaries (no Godot install required) are published on [GitHub Release
 - Scrollback history stored in SQLite
 
 ### Pane Types
-- Terminal — PTY-backed shell sessions
-- Code Viewer — read-only `CodeEdit` display, receives concept captures
-- File Tree — directory listing via `DirAccess`
-- Observer — display-only pane for monitoring output
+- Terminal -- PTY-backed shell sessions
+- Code Viewer -- read-only `CodeEdit` display, receives concept captures
+- File Tree -- directory listing via `DirAccess`
+- Observer -- display-only pane for monitoring output
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md) for planned features.
 
@@ -80,7 +80,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md
 
 ### Prerequisites
 
-- Rust ≥ 1.85 (currently being developed on 1.96.0)
+- Rust >= 1.85 (currently being developed on 1.96.0)
 - Linux (primary target) or Windows 11 (ConPTY supported via `portable-pty`)
 - Godot 4.4+ (currently being developed on 4.7) with GDExtension support
 
@@ -116,6 +116,11 @@ cargo run --bin godopty-cli -- --term
 # Build the GDExtension
 cargo build -p godopty-gdext
 
+# Release build + local export
+cargo build -p godopty-gdext --release
+cp target/release/libgodopty_gdext.so godot/bin/libgodopty_gdext.linux.x86_64.so
+godot --headless --path godot --export-release "Linux/X11" dist/godopty
+
 # Open in Godot editor
 cd godot && godot -e
 
@@ -133,7 +138,7 @@ Concept {
     trigger_regex: Regex::new(r"(?i)address.*already.*in\s*use").unwrap(),
     destinations: vec![Action {
         command_template: "echo '[Auto] Port conflict detected - consider lsof -i'",
-        target_label: "observer",   // only delivered to terminals with this label
+        target_label: "observer",
     }],
 }
 ```
@@ -167,9 +172,9 @@ Security Warning: The Concept Engine is designed to execute commands automatical
 - Environment variable setup differs per platform
 
 ### SIGWINCH (Window Resize)
-- Godot `SplitContainer` resize → GDScript signal
+- Godot `SplitContainer` resize -> GDScript signal
 - Pass new `(rows, cols)` through `gdext` to Rust
-- Forward `PtySize` to `portable-pty` master → OS sends `SIGWINCH` to child process
+- Forward `PtySize` to `portable-pty` master -> OS sends `SIGWINCH` to child process
 - `alacritty_terminal` reflows the grid
 
 ### gdext + tokio Bridge
@@ -189,4 +194,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and t
 
 ## License
 
-This project is licensed under the Apache License, Version 2.0 — see [LICENSE](LICENSE) for details.
+This project is licensed under the Apache License, Version 2.0 -- see [LICENSE](LICENSE) for details.

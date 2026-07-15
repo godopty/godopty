@@ -133,6 +133,7 @@ jobs:
         run: |
           mkdir -p dist
           godot --headless --path godot --export-release "Linux/X11" "dist/godopty-${VERSION}-linux-x86_64"
+          tar -czf "dist/godopty-${VERSION}-linux-x86_64.tar.gz" -C dist "godopty-${VERSION}-linux-x86_64"
 
       - name: Export Windows
         run: |
@@ -140,8 +141,7 @@ jobs:
 
       - name: Export macOS
         run: |
-          godot --headless --path godot --export-release "macOS" "dist/godopty-${VERSION}-macos-arm64.zip"
-
+          godot --headless --path godot --export-release "macOS" "dist/godopty-${VERSION}-macos.zip"
       - name: Copy GDExtension artifacts for release
         run: |
           mkdir -p dist/gdextension
@@ -151,8 +151,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/godopty-${VERSION}-linux-x86_64
+            dist/godopty-${VERSION}-linux-x86_64.tar.gz
             dist/godopty-${VERSION}-windows-x86_64.exe
-            dist/godopty-${VERSION}-macos-arm64.zip
+            dist/godopty-${VERSION}-macos.zip
             dist/gdextension/*
-          generate_release_notes: true
