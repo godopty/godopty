@@ -227,37 +227,8 @@ struct TaskContext {
     capture_event_id: u64,
     capture_buffers: Arc<Mutex<HashMap<u64, Vec<Vec<u8>>>>>,
     capture_queue: Arc<Mutex<Vec<CapturedOutput>>>,
-    // Pending capture — set on concept match, confirmed on next non-prompt line
-    pending_capture_name: Option<String>,
-    pending_capture_mode: Option<CaptureMode>,
-    pending_capture_target: Option<String>,
 }
 
-/// Returns true if `line` looks like a shell prompt.
-fn is_prompt_line(line: &str) -> bool {
-    let trimmed = line.trim();
-    if trimmed.len() > 40 { return false; }
-    // Starts with $, #, > (common basic prompts)
-    // or ends with $, #, > followed by optional space (common fancy prompts)
-    trimmed.starts_with('$') || trimmed.starts_with('#') || trimmed.starts_with('>')
-        || trimmed.ends_with("$ ") || trimmed.ends_with("# ") || trimmed.ends_with("> ")
-        || trimmed.ends_with('$') || trimmed.ends_with('#') || trimmed.ends_with('>')
-}
-
-
-/// Check if raw bytes end with a shell prompt that has no trailing
-/// newline (e.g., Tab completion reprint). The line parser never emits
-/// these, so we must scan the raw bytes.
-fn chunk_ends_with_prompt(bytes: &[u8]) -> bool {
-    if let Ok(s) = std::str::from_utf8(bytes) {
-        let trimmed = s.trim_end();
-        if let Some(last_line) = trimmed.lines().last() {
-            let t = last_line.trim();
-            return t.contains("$ ") || t.contains("# ") || t.contains("> ");
-        }
-    }
-    false
-}
 impl TaskContext {
     fn new(
         id: u32,
@@ -279,9 +250,6 @@ impl TaskContext {
             capture_event_id: 0,
             capture_buffers: Arc::new(Mutex::new(HashMap::new())),
             capture_queue: Arc::new(Mutex::new(Vec::new())),
-            pending_capture_name: None,
-            pending_capture_mode: None,
-            pending_capture_target: None,
         }
     }
 }
@@ -457,66 +425,17 @@ async fn run_terminal_task(
                             timeout_sleep.as_mut().reset(tokio::time::Instant::now() + INACTIVE_DURATION);
                         }
                     }
-                } else if ctx.pending_capture_name.is_some() {
-                    // We have a pending capture — check if this chunk
-                    // contains a prompt (Tab completion) or real output.
-                    let has_prompt = lines.iter().any(|l| is_prompt_line(l))
-                        || chunk_ends_with_prompt(&bytes);
-                    if has_prompt {
-                        // Cancelled: this was shell completion noise
-                        ctx.pending_capture_name = None;
-                        ctx.pending_capture_mode = None;
-                        ctx.pending_capture_target = None;
-                        feed_grid(&grid, &bytes);
-                        for line in &lines {
-                            store_line(&grid, line);
-                        }
-                    } else {
-                        // Confirmed: enter capture mode from pending
-                        let name = ctx.pending_capture_name.take().unwrap();
-                        let target = ctx.pending_capture_target.take().unwrap_or_default();
-                        let mode = ctx.pending_capture_mode.take().unwrap();
-                        ctx.active_capture_name = Some(name);
-                        ctx.active_capture_target = Some(target);
-                        if let CaptureMode::UntilStop { stop_timeout_ms, .. } = mode {
-                            let deadline = tokio::time::Instant::now()
-                                + Duration::from_millis(stop_timeout_ms);
-                            ctx.capture_deadline = Some(deadline);
-                            timeout_sleep.as_mut().reset(deadline);
-                        }
-                        ctx.capture_buffer.push(bytes);
-                    }
                 } else {
-                    // Normal mode: check for concept matches
-                    let mut matched_line = None;
+                    // Normal mode: run match_and_broadcast for SingleLine
+                    // concepts (event broadcast for command injection).
+                    // UntilStop concepts are matched on stdin, not here.
                     for line in &lines {
                         let concepts_guard = ctx.concepts.read().unwrap();
-                        let maybe_capture = concept::match_and_broadcast(
+                        let _ = concept::match_and_broadcast(
                             ctx.id, &concepts_guard, &ctx.tx, line,
                         );
-                        if let Some((name, mode)) = maybe_capture {
-                            if let CaptureMode::UntilStop { .. } = mode {
-                                let target = concepts_guard.iter()
-                                    .find(|c| c.name == name)
-                                    .and_then(|c| c.destinations.first())
-                                    .map(|a| a.target_label.clone())
-                                    .unwrap_or_default();
-                                drop(concepts_guard);
-                                // Don't enter capture yet — set pending
-                                // to avoid capturing Tab completion output.
-                                matched_line = Some((name, mode, target));
-                                break;
-                            }
-                        }
                         drop(concepts_guard);
                     }
-                    if let Some((name, mode, target)) = matched_line {
-                        ctx.pending_capture_name = Some(name);
-                        ctx.pending_capture_mode = Some(mode);
-                        ctx.pending_capture_target = Some(target);
-                    }
-                    // Always feed the current chunk — the command line
-                    // should remain visible on the terminal.
                     feed_grid(&grid, &bytes);
                     for line in &lines {
                         store_line(&grid, line);
@@ -532,6 +451,30 @@ async fn run_terminal_task(
                 }
                 match &input {
                     StdinInput::Line(line) => {
+                        // Match UntilStop concepts on user input (Enter).
+                        // This avoids false triggers from Tab completion,
+                        // command echo, and shell output noise.
+                        if ctx.active_capture_name.is_none() {
+                            let concepts_guard = ctx.concepts.read().unwrap();
+                            for concept in concepts_guard.iter() {
+                                if !concept.enabled { continue; }
+                                if concept.trigger_regex.is_match(line) {
+                                    if let CaptureMode::UntilStop { stop_timeout_ms, .. } = &concept.capture_mode {
+                                        let target = concept.destinations.first()
+                                            .map(|a| a.target_label.clone())
+                                            .unwrap_or_default();
+                                        ctx.active_capture_name = Some(concept.name.clone());
+                                        ctx.active_capture_target = Some(target);
+                                        let deadline = tokio::time::Instant::now()
+                                            + Duration::from_millis(*stop_timeout_ms);
+                                        ctx.capture_deadline = Some(deadline);
+                                        timeout_sleep.as_mut().reset(deadline);
+                                        break;
+                                    }
+                                }
+                            }
+                            drop(concepts_guard);
+                        }
                         let _ = pty_handle.write_line(line);
                     }
                     StdinInput::Raw(data) => {
