@@ -26,11 +26,11 @@ godopty (goh-doh-tee), a Godot-based Rust multi-PTY emulator desktop application
 
 ## Installation
 
-Standalone binaries (no Godot install required) are published on [GitHub Releases](https://github.com/BlobGlob/godopty/releases) for Linux, macOS, and Windows.
+Standalone binaries (no Godot install required) are published on [GitHub Releases](https://github.com/godopty/godopty/releases) for Linux, macOS, and Windows.
 
 | Platform | Package |
 |---|---|
-| Linux | Download `godopty-linux-x86_64.tar.gz` from the [latest release](https://github.com/BlobGlob/godopty/releases/latest) |
+| Linux | Download `godopty-linux-x86_64.tar.gz` from the [latest release](https://github.com/godopty/godopty/releases/latest) |
 | macOS | Download `godopty-macos.zip`, unzip, right-click -> Open (unsigned) |
 | Windows | Download `godopty-windows-x86_64.exe` |
 
@@ -88,7 +88,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md
 
 ```bash
 # Clone
-git clone https://github.com/BlobGlob/godopty.git godopty
+git clone https://github.com/godopty/godopty.git godopty
 cd godopty
 
 # Build

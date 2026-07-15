@@ -1,6 +1,6 @@
 # Roadmap
 
-Planned features for future releases. Tracked in detail via [GitHub Issues](https://github.com/BlobGlob/godopty/issues).
+Planned features for future releases. Tracked in detail via [GitHub Issues](https://github.com/godopty/godopty/issues).
 
 ## v0.2.0
 

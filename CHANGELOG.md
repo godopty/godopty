@@ -34,4 +34,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standalone export presets (Linux, macOS, Windows) with CI release workflow
 - 60 Rust tests (core + integration) and 40+ GDScript unit/integration tests
 
-[0.1.0]: https://github.com/BlobGlob/godopty/releases/tag/v0.1.0
+[0.1.0]: https://github.com/godopty/godopty/releases/tag/v0.1.0

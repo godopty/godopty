@@ -1,11 +1,11 @@
 # Maintainer: godopty contributors
-# GitHub: https://github.com/BlobGlob/godopty
+# GitHub: https://github.com/godopty/godopty
 pkgname=godopty-bin
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="Multi-PTY terminal emulator with tiling grid GUI"
 arch=('x86_64')
-url="https://github.com/BlobGlob/godopty"
+url="https://github.com/godopty/godopty"
 license=('Apache-2.0')
 depends=()
 source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/godopty-v$pkgver-linux-x86_64.tar.gz"
