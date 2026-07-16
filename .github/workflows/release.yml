@@ -129,30 +129,22 @@ jobs:
           mkdir -p godot/bin
           find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) | while read f; do
             cp "$f" godot/bin/
-          done
-          ls -la godot/bin/
-
-      - name: Import project
-        run: godot --headless --path godot --import
-
       - name: Export Linux
         run: |
-          mkdir -p dist
-          godot --headless --path godot --export-release "Linux/X11" "dist/godopty-${VERSION}-linux-x86_64"
-          tar -czf "dist/godopty-${VERSION}-linux-x86_64.tar.gz" -C dist "godopty-${VERSION}-linux-x86_64"
-
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          godot --headless --path godot --export-release "Linux/X11" "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-linux-x86_64"
+          tar -czf "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-linux-x86_64.tar.gz" -C "$GITHUB_WORKSPACE/dist" "godopty-${VERSION}-linux-x86_64"
       - name: Export Windows
         run: |
-          godot --headless --path godot --export-release "Windows Desktop" "dist/godopty-${VERSION}-windows-x86_64.exe"
-
+          godot --headless --path godot --export-release "Windows Desktop" "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-windows-x86_64.exe"
       - name: Export macOS
         run: |
-          godot --headless --path godot --export-release "macOS" "dist/godopty-${VERSION}-macos.zip"
+          godot --headless --path godot --export-release "macOS" "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-macos.zip"
+
       - name: Copy GDExtension artifacts for release
         run: |
-          mkdir -p dist/gdextension
-          find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) -exec cp {} dist/gdextension/ \;
-
+          mkdir -p "$GITHUB_WORKSPACE/dist/gdextension"
+          find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) -exec cp {} "$GITHUB_WORKSPACE/dist/gdextension/" \;
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
