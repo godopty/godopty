@@ -98,7 +98,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-
       - name: Install Godot headless
         run: |
           sudo apt-get update -y && sudo apt-get install -y wget unzip
@@ -106,25 +105,24 @@ jobs:
           unzip Godot_v4.7-stable_linux.x86_64.zip
           chmod +x Godot_v4.7-stable_linux.x86_64
           sudo mv Godot_v4.7-stable_linux.x86_64 /usr/local/bin/godot
+
       - name: Install Godot export templates
         run: |
           wget -q https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_export_templates.tpz
           mkdir -p ~/.local/share/godot/export_templates/4.7.stable
           mkdir -p /tmp/godot-templates
           unzip -qo Godot_v4.7-stable_export_templates.tpz -d /tmp/godot-templates
-          # Handle both structures: with or without a templates/ subdirectory
           if [ -d /tmp/godot-templates/templates ]; then
             mv /tmp/godot-templates/templates/* ~/.local/share/godot/export_templates/4.7.stable/
           else
             mv /tmp/godot-templates/* ~/.local/share/godot/export_templates/4.7.stable/
           fi
-          # Godot 4.7 requires macOS template extracted from macos.zip
           cd ~/.local/share/godot/export_templates/4.7.stable
           if [ -f macos.zip ]; then
             unzip -qo macos.zip "macos_template.app/Contents/MacOS/*" -d .
-            ls -la macos_template.app/Contents/MacOS/
           fi
           ls -la ~/.local/share/godot/export_templates/4.7.stable/
+
       - name: Download GDExtension artifacts
         uses: actions/download-artifact@v4
         with:
@@ -136,6 +134,7 @@ jobs:
           find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) | while read f; do
             cp "$f" godot/bin/
           done
+          ls -la godot/bin/
 
       - name: Import project
         run: godot --headless --path godot --import
@@ -145,9 +144,14 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-linux-x86_64"
           godot --headless --path godot --export-release "Linux/X11" "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-linux-x86_64/godopty"
           tar -czf "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-linux-x86_64.tar.gz" -C "$GITHUB_WORKSPACE/dist" "godopty-${VERSION}-linux-x86_64"
+
       - name: Export Windows
         run: |
-          godot --headless --path godot --export-release "Windows Desktop" "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-windows-x86_64.exe"
+          mkdir -p "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-windows-x86_64"
+          godot --headless --path godot --export-release "Windows Desktop" "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-windows-x86_64/godopty.exe"
+          cp godot/bin/godopty_gdext.windows.x86_64.dll "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-windows-x86_64/" 2>/dev/null || true
+          cd "$GITHUB_WORKSPACE/dist" && zip -r "godopty-${VERSION}-windows-x86_64.zip" "godopty-${VERSION}-windows-x86_64"
+
       - name: Export macOS
         run: |
           godot --headless --path godot --export-release "macOS" "$GITHUB_WORKSPACE/dist/godopty-${VERSION}-macos.zip"
@@ -156,12 +160,13 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/dist/gdextension"
           find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) -exec cp {} "$GITHUB_WORKSPACE/dist/gdextension/" \;
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/godopty-${{ github.ref_name }}-linux-x86_64.tar.gz
-            dist/godopty-${{ github.ref_name }}-windows-x86_64.exe
+            dist/godopty-${{ github.ref_name }}-windows-x86_64.zip
             dist/godopty-${{ github.ref_name }}-macos.zip
             dist/gdextension/*
           generate_release_notes: true
