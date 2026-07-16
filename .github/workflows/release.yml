@@ -39,7 +39,7 @@ jobs:
         target:
           - runner: macos-latest
             arch: arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             arch: x86_64
     runs-on: ${{ matrix.target.runner }}
     steps:
