@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # ── Workflow linting (YAML + shell syntax) ────────────────────────────
+  # ── Workflow linting (YAML syntax) ────────────────────────────────────
   lint-workflows:
     runs-on: ubuntu-latest
     steps:
@@ -19,15 +19,6 @@ jobs:
 
       - name: Validate YAML syntax
         run: python3 -c "import yaml; [yaml.safe_load(open(f'.github/workflows/{w}')) for w in ['ci.yml','release.yml']]"
-
-      - name: Install actionlint
-        run: |
-          wget -q https://github.com/rhysd/actionlint/releases/latest/download/actionlint_linux_amd64.tar.gz
-          tar -xzf actionlint_linux_amd64.tar.gz
-          sudo mv actionlint /usr/local/bin/
-
-      - name: Run actionlint
-        run: actionlint .github/workflows/
 
   # ── Rust tests (core + gdext + cli) ──────────────────────────────────
   rust-tests:

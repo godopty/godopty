@@ -118,6 +118,12 @@ jobs:
           else
             mv /tmp/godot-templates/* ~/.local/share/godot/export_templates/4.7.stable/
           fi
+          # Godot 4.7 requires macOS template extracted from macos.zip
+          cd ~/.local/share/godot/export_templates/4.7.stable
+          if [ -f macos.zip ]; then
+            unzip -qo macos.zip "macos_template.app/Contents/MacOS/*" -d .
+            ls -la macos_template.app/Contents/MacOS/
+          fi
           ls -la ~/.local/share/godot/export_templates/4.7.stable/
       - name: Download GDExtension artifacts
         uses: actions/download-artifact@v4
