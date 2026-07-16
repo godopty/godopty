@@ -131,6 +131,9 @@ jobs:
             cp "$f" godot/bin/
           done
           ls -la godot/bin/
+
+      - name: Import project
+        run: godot --headless --path godot --import
       - name: Export Linux
         run: |
           mkdir -p "$GITHUB_WORKSPACE/dist"
