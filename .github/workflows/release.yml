@@ -129,6 +129,8 @@ jobs:
           mkdir -p godot/bin
           find gdext-artifacts -type f \( -name '*.so' -o -name '*.dylib' -o -name '*.dll' \) | while read f; do
             cp "$f" godot/bin/
+          done
+          ls -la godot/bin/
       - name: Export Linux
         run: |
           mkdir -p "$GITHUB_WORKSPACE/dist"
