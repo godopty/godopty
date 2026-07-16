@@ -31,3 +31,8 @@ LayoutManager="*res://scenes/autoloads/layout_manager.gd"
 
 window/size/viewport_width=1920
 window/size/viewport_height=1080
+
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
