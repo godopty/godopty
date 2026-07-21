@@ -17,6 +17,8 @@ config/features=PackedStringArray("4.7")
 
 config/icon=""
 
+[autoload]
+
 FocusManager="*res://scenes/autoloads/focus_manager.gd"
 ToastManager="*res://scenes/autoloads/toast_manager.gd"
 ShortcutManager="*res://scenes/autoloads/shortcut_manager.gd"
