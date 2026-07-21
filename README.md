@@ -6,7 +6,7 @@ godopty (goh-doh-tee), a Godot-based Rust multi-PTY emulator desktop application
 
 - Reactive Automation: Rather than acting as a passive text pipe, the terminal reads its own output. The built-in pub-sub engine detects matched patterns and automatically executes actions (fixes, restarts, or notifications) in adjacent panes.
 - Unrestricted Aesthetics: Built on Godot to support fluid animations, instant theming, and rich UI overlays without the memory overhead of an embedded browser.
-- Zero-Friction Tiling: Managing multiple panes relies on a native graphical grid and drag-and-drop mechanics, bypassing the need to memorize complex keyboard multiplexer bindings.
+- Zero-Friction Tiling: Managing multiple panes relies on a native graphical grid and drag-and-drop (coming soon) mechanics, bypassing the need to memorize complex keyboard multiplexer bindings.
 - Open source, no telemetry, no logins.
 
 ---
@@ -30,9 +30,9 @@ Standalone binaries (no Godot install required) are published on [GitHub Release
 
 | Platform | Package |
 |---|---|
-| Linux | Download `godopty-linux-x86_64.tar.gz` from the [latest release](https://github.com/godopty/godopty/releases/latest) |
-| macOS | Download `godopty-macos.zip`, unzip, right-click -> Open (unsigned) |
-| Windows | Download `godopty-windows-x86_64.exe` |
+| Linux | `godopty-v0.1.0-linux-x86_64.tar.gz` — extract and run `./godopty` |
+| macOS | `godopty-v0.1.0-macos.zip` — unzip, right-click the `.app` → Open |
+| Windows | `godopty-v0.1.0-windows-x86_64.zip` — unzip and run `godopty.exe` |
 
 ---
 
@@ -67,10 +67,10 @@ Standalone binaries (no Godot install required) are published on [GitHub Release
 - Scrollback history stored in SQLite
 
 ### Pane Types
-- Terminal -- PTY-backed shell sessions
-- Code Viewer -- read-only `CodeEdit` display, receives concept captures
-- File Tree -- directory listing via `DirAccess`
-- Observer -- display-only pane for monitoring output
+- Terminal — PTY-backed shell sessions
+- Code Viewer — read-only `CodeEdit` display, receives concept captures
+- File Tree — directory listing via `DirAccess`
+- Observer — display-only pane for monitoring output
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [ROADMAP.md](ROADMAP.md) for planned features.
 
